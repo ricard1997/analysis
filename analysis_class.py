@@ -25,8 +25,10 @@ class analysis:
         self.traj = traj # Set the traj
 
         self.color = ['tab:blue', 'tab:orange', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink'] # Set a palette color if needed
-
-        if membrane != None:
+        
+        if lipid_list:
+            membrane = True
+        if membrane:
             self.lipid_list = lipid_list # Lipids in study
 
 
@@ -38,12 +40,16 @@ class analysis:
                                 "DOPS" : {"head" :"P", "charge" : 0.1},
                                 "POPS" : {"head" :"P", "charge" : 0.1},
                                 "DSPE" : {"head" :"P", "charge" : 1.3},
+                                "DOPC" : {"head" :"P", "charge" : 1.3},
+                                "DOPE" : {"head" :"P", "charge" : 1.3},
+                                "POPI1" : {"head" :"P", "charge" : 1.3},
+                                "POPI2" : {"head" :"P", "charge" : 1.3},
                             } #List of known lipids and lipids head people usually use to work
 
 
         self.test = True
-        self.rna_at = rna_at
-        self.rna_resid = rna_resid
+#        self.rna_at = rna_at
+#        self.rna_resid = rna_resid
         self.start = start
         self.final = final
         self.step = step
@@ -51,32 +57,32 @@ class analysis:
         self.upper_lim = None
         self.ha_table = None
         self.p_table = None
-        self.working_lip = {
-            "CHL1" : "O3",
-            "DODMA" : "N1",
-            "DSPC" : "P",
-            "POPE" : "P",
-            "DOPS" : "P",
-            "POPS" : "P",
-            "DSPE" : "P",
-        }
+#        self.working_lip = {
+#            "CHL1" : "O3",
+#            "DODMA" : "N1",
+#            "DSPC" : "P",
+#            "POPE" : "P",
+#            "DOPS" : "P",
+#            "POPS" : "P",
+#            "DSPE" : "P",
+#        }
 
-        self.charge_li = {'DSPC' : 1.1,
-		                    'POPE' : 1.1,
-		                    'DODMA' : -0.21,
-		                    'POPS' : 0.1,
-		                    'DOPS' : 0.1,
-		                    'DSPE' : 1.3
-                            }
+#        self.charge_li = {'DSPC' : 1.1,
+#		                    'POPE' : 1.1,
+#		                    'DODMA' : -0.21,
+#		                    'POPS' : 0.1,
+#		                    'DOPS' : 0.1,
+#		                    'DSPE' : 1.3
+#                            }
         print("###### Correctly initialized class rna ##########################")
         print(f"With \ntopology: {self.top},  trajectory: {self.traj}")
         print(f"Start of the trajectory: {self.start}")
         print(f"Final of the trajectory: {self.final}")
         print(f"Step of the trajectory: {self.step}")
 
-        print(f"Lipids under consideration to find the middle of the membrane {self.lipids_dict}")
-        print(f"Heavy atoms of RNA: {self.rna_at}")
-        print(f"Resids corresponding to RNA: {self.rna_resid}")
+        print(f"Lipids under consideration to find the middle of the membrane {self.lipid_list}")
+ #       print(f"Heavy atoms of RNA: {self.rna_at}")
+        #print(f"Resids corresponding to RNA: {self.rna_resid}")
         self.u = mda.Universe(self.top, self.traj)
         print(f"Lenght of the trajectory:{len(self.u.trajectory)}")
         self.lentraj = len(self.u.trajectory)
@@ -161,7 +167,7 @@ class analysis:
             mean_z = positions.mean()
 
             # Selects the lipid head and of the working lipid
-            selection_string = f"(resname {lipid} and name {self.working_lip[lipid]}) and prop z {sign} {str(mean_z)}"
+            selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
 
 
             # Find the positions of the P atoms
@@ -187,11 +193,11 @@ class analysis:
 
         pos_data = np.concatenate(pos_data, axis = 0)
         df_data = pd.DataFrame(pos_data, columns = ["x", "y", "z", "id"])
-
+        df_data["id"] = df_data["id"].astype(int)
         if include_charge:
             df_data["charge"] = self.charge_li[lipid]
             df_data.to_csv(f"pd_{filename}", index = False)
-        df_data.to_csv(f"{filename}", pos_data, delimiter = ',')
+        df_data.to_csv(f"{filename}", index = False)
 
         return df_data   # Maybe have to change, it does not make sense to return this
 
@@ -207,11 +213,10 @@ class analysis:
                 filename = None, include_charge = False):
         lipid_data_dict = {}
         for lipid in lipids:
-            lipid_data_dict[lipid] = surface(self,
-                    start = None,
+            lipid_data_dict[lipid] = self.surface(start = None,
                     final = None,
                     step = None,
-                    lipid = "DSPC",
+                    lipid = lipid,
                     layer = 'up',
                     filename = None, include_charge = False)
         return lipid_data_dict
