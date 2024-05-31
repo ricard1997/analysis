@@ -235,7 +235,7 @@ class analysis:
             costheta = vectores[:,2]**2/np.linalg.norm(vectores, axis = 1)**2 # Compute the costheta^2
             angles.append(costheta) # dim (n_lipids,)
         angles = np.array(angles) # dim ((2 or 3),n_lipids)
-        #print(angles.shape)
+        print("angles", angles.shape)
         angles = np.mean(angles, axis = 0) # output is dim n_lipids, it means the cos^2(theta) or the Carbon passed for each lipid
         return angles
 
@@ -270,6 +270,7 @@ class analysis:
                     lista.append(atoms)
             # Call get_individual that computes the cos^2(theta) for each carbon.
             chains.append(self.get_individual(lista))
+            print(i, self.get_individual(lista).shape, self.get_individual(lista))
         chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
         return chains
 
@@ -524,13 +525,15 @@ class analysis:
         for ts in self.u.trajectory[start:final:step]:
             z = all_p.positions[:,2]
             z_mean = z.mean() # get middel of the membrane
-
             #Pick atoms in the layer
-            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]}) and prop z {sign} {z_mean})")
-            only_p = layer.select_atoms(f"name {self.working_lip[lipid]}")
+            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
+            print(all_p.n_atoms, z_mean, layer.n_atoms)
+            
+            only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
             angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
+            print(angles_sn1.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
                 angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
