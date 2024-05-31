@@ -19,13 +19,14 @@ class analysis:
                                 protein_resids = None,
                                 rna_resids = None,
                                 time_scale = None,
+                                ddrange = None,
                                 ):
 
         self.top = top # Set the topology
         self.traj = traj # Set the traj
 
         self.color = ['tab:blue', 'tab:orange', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink'] # Set a palette color if needed
-        
+
         if lipid_list:
             membrane = True
         if membrane:
@@ -57,6 +58,8 @@ class analysis:
         self.upper_lim = None
         self.ha_table = None
         self.p_table = None
+
+        self.range = ddrange
 #        self.working_lip = {
 #            "CHL1" : "O3",
 #            "DODMA" : "N1",
@@ -220,6 +223,333 @@ class analysis:
                     layer = 'up',
                     filename = None, include_charge = False)
         return lipid_data_dict
+
+################## Code related to 2D order parameters ##########################
+
+    # Given a list of the shape [C, Hx, Hy, Hz], gets the vectos contecting teh hydrogen ti the C and compute the indivifual cos^2theta) for each carbon for each lipid in the original selection (must be called after individual_order_sn1 or ns2
+    @staticmethod
+    def get_individual(lista):
+        angles = [] # Store the angles
+        for i in (range(len(lista)-1)): # Accounts for variable number of list (Change if the carbon has or not double bonds)
+            vectores = lista[i+1].positions - lista[0].positions # Hidrogen - Carbons; output of shape (n_lipids, 3)
+            costheta = vectores[:,2]**2/np.linalg.norm(vectores, axis = 1)**2 # Compute the costheta^2
+            angles.append(costheta) # dim (n_lipids,)
+        angles = np.array(angles) # dim ((2 or 3),n_lipids)
+        #print(angles.shape)
+        angles = np.mean(angles, axis = 0) # output is dim n_lipids, it means the cos^2(theta) or the Carbon passed for each lipid
+        return angles
+
+
+
+
+    # Get the cos^2(theta) for each carbon in the selection, for sn1
+    def individual_order_sn1(self, sel, lipid, n_chain):
+        # Define list to store the chain cos^2(theta)
+        chains = []
+
+        # Loop over carbons
+        for i in range(n_chain):
+            # Define selections for H and C in the chain
+            selections = [
+                            f"name C3{i+2}",
+                            f"name H{i+2}X and not name HX",
+                            f"name H{i+2}Y and not name HY",
+                            f"name H{i+2}Z and not name HZ"
+                        ]
+            #print(selections)
+
+
+            # Define a list to store atoms
+            lista = []
+
+            for selection in selections:
+                atoms = sel.select_atoms(selection)
+
+
+                if atoms.n_atoms != 0:
+                    lista.append(atoms)
+            # Call get_individual that computes the cos^2(theta) for each carbon.
+            chains.append(self.get_individual(lista))
+        chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
+        return chains
+
+
+
+
+
+    # Get the cos^2(theta) for each carbon in the selection, for sn2
+
+    def individual_order_sn2(self, sel, lipid, n_chain):
+        # Define list to store the chain cos^2(theta)
+        chains = []
+
+        # Loop over carbons
+        max_v = 0
+        for i in range(n_chain):
+            # Define selections for H and C in the chain
+            selections = [
+                            f"name C2{i+2}",
+                            f"name H{i+2}R and not name HR",
+                            f"name H{i+2}S and not name HS",
+                            f"name H{i+2}T and not name HT"
+                        ]
+            if lipid == "POPE" or lipid == "POPS":
+                if selections[0] == "name C29":
+                    selections[1] = "name H91"
+                if selections[0] == "name C210":
+                    selections[1] = "name H101"
+            # Define a list to store atoms
+            lista = []
+
+            for selection in selections:
+                atoms = sel.select_atoms(selection)
+
+
+                if atoms.n_atoms != 0:
+                    lista.append(atoms)
+            # Call get_individual that computes the cos^2(theta) for each carbon.
+            angles = self.get_individual(lista)
+            if len(angles) > max_v:
+                max_v = len(angles)
+            chains.append(angles)
+
+        #for i in range(len(chains)):
+        #    print(len(chains[i]))
+        #    while len(chains[i]) < max_v:
+        #        chain[i].append(np.nan)
+
+        chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
+        #print("Individual_order_sn2:",chains.shape )
+        return chains
+
+
+
+
+
+
+
+    @staticmethod
+    def count_order(data, min_lenght, n_chain):
+        columns = ["index"]
+        carbons_sn2 = False
+        try:
+            carbons_sn1 = [f"sn1-{i+2}" for i in range(n_chain[0]) ]
+            carbons_sn2 = [f"sn2-{i+2}" for i in range(n_chain[1])]
+            columns = columns + carbons_sn1 + carbons_sn2
+        except:
+            carbons_sn1 = [f"sn1-{i+2}" for i in range(n_chain) ]
+            columns = columns + carbons_sn1
+
+
+        df = pd.DataFrame(data, columns = columns)
+        result = []
+
+        for i in range(min_lenght):
+            temp = df[df["index"] == i]
+            if len(temp) > 0 :
+                sn1 = temp[carbons_sn1]
+                sn1 = sn1.mean()
+                sn1 = 1.5 * sn1 - 0.5
+                sn1 = sn1.abs()
+                sn1 = sn1.mean()
+                final = sn1
+                if carbons_sn2:
+                    sn2 = temp[carbons_sn2]
+                    sn2 = sn2.mean()
+                    sn2 = 1.5 * sn2 - 0.5
+                    sn2 = sn2.abs()
+                    sn2 = sn2.mean()
+
+                    final = (final + sn2)*0.5
+                result.append([i,final])
+            else:
+                result.append([i,0])
+        result = np.array(result)
+        result = result[:,1]
+        return result
+
+
+    # Method to average vector to pseudovector program
+    @staticmethod
+    def average_vector(data, min_lenght):
+        columns = ["index", "x", "y", "z"] # Data expected is an np array with columns ["index", "x", "y", "z"]
+
+        df = pd.DataFrame(data, columns = columns)
+        result = []
+
+        for i in range(min_lenght):
+            temp = df[df["index"] == i]
+            if len(temp) > 0 :
+                bin_vect = temp[columns[1:]]
+                bin_vect = bin_vect.mean()
+                result.append(bin_vect.to_list())
+            else:
+                result.append([np.nan, np.nan, np.nan])
+        result = np.array(result)
+
+        return result
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Computes the average vector for each bin, sample are the raw x,y positions and weights are the vectors related to the head
+    def pseudohistogram2D(self,sample1, weights, bins = 10, v_min = None, v_max = None):
+        if v_min == None:
+            v_min = np.min(sample1)
+        if v_max == None:
+            v_max = np.max(sample1)
+
+        #print(v_min, v_max)
+        nbin = np.empty(2,np.intp)
+        edges = 2*[None]
+
+        for i in range(2):
+            edges[i] = np.linspace(v_min, v_max, bins +1)
+            nbin[i] = len(edges[i]) + 1
+
+        Ncount = (tuple(np.searchsorted(edges[i], sample1[:,i], side = "right") for i in range(2)))
+
+        for i in range(2):
+            on_edge = (sample1[:,i] == edges[i][-1])
+            Ncount[i][on_edge] -= 1
+
+
+        xy = np.ravel_multi_index(Ncount, nbin)
+        xy_test = xy.reshape(-1,1)
+
+        xy_test = np.concatenate((xy_test, weights), axis = 1)
+        hist = self.average_vector(xy_test, nbin.prod())
+        nbin = (nbin[0], nbin[1], 3)
+        hist = hist.reshape(nbin)
+        hist = hist.astype(float, casting = "safe")
+        core = 2*(slice(1,-1),)
+        hist = hist[core]
+
+        return hist, edges
+
+
+
+
+
+
+
+
+
+
+    # Computes teh histogram of the average order parameters in each bin
+    def histogram2D(self,sample1, weights, n_chain, bins = 10, v_min = None, v_max = None):
+        if v_min == None:
+            v_min = np.min(sample1)
+        if v_max == None:
+            v_max = np.max(sample1)
+
+        #print(v_min, v_max)
+        nbin = np.empty(2,np.intp)
+        edges = 2*[None]
+
+        for i in range(2):
+            edges[i] = np.linspace(v_min, v_max, bins +1)
+            nbin[i] = len(edges[i]) + 1
+
+        Ncount = (tuple(np.searchsorted(edges[i], sample1[:,i], side = "right") for i in range(2)))
+
+        for i in range(2):
+            on_edge = (sample1[:,i] == edges[i][-1])
+            Ncount[i][on_edge] -= 1
+
+
+        xy = np.ravel_multi_index(Ncount, nbin)
+        xy_test = xy.reshape(-1,1)
+
+        xy_test = np.concatenate((xy_test, weights), axis = 1)
+
+        hist = self.count_order(xy_test, nbin.prod(), n_chain)
+        hist = hist.reshape(nbin)
+        hist = hist.astype(float, casting = "safe")
+        core = 2*(slice(1,-1),)
+        hist = hist[core]
+
+        return hist, edges
+
+
+
+
+
+
+
+    def order_histogram(self, lipid, layer, n_grid,
+                        n_chain,
+                        v_min = None,
+                        v_max = None,
+                        all_p = None,
+                        start = None,
+                        final = None,
+                        step = 1):
+
+        if all_p == None:
+            all_p = self.all_p
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
+            sign = " < "
+
+        try:
+            n_chain1 = n_chain[0]
+            n_chain2 = n_chain[1]
+        except:
+            n_chain1 = n_chain
+            n_chain2 = 0
+
+        matrix = [] # this will store a matrix of the shape (2+n_chain,
+
+        for ts in self.u.trajectory[start:final:step]:
+            z = all_p.positions[:,2]
+            z_mean = z.mean() # get middel of the membrane
+
+            #Pick atoms in the layer
+            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]}) and prop z {sign} {z_mean})")
+            only_p = layer.select_atoms(f"name {self.working_lip[lipid]}")
+            positions = only_p.positions[:,:2]
+            angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
+            angles_sn1 = angles_sn1.T
+            to_write = np.concatenate([positions, angles_sn1], axis = 1)
+            if n_chain2 != 0:
+                angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
+                angles_sn2 = angles_sn2.T
+                to_write = np.concatenate([to_write, angles_sn2], axis = 1)
+
+            matrix.append(to_write) # Expect dim (n_lipids, 2+n_chain1+n_chain2)
+            #print("Frame:",to_write.shape)
+
+        #matrix = np.array(matrix) # Expect dim (frames, n_lipids, 2+n_chain1+n_chain2)
+        matrix = np.concatenate(matrix, axis = 0) # Expect dim (n_lipids*frames, 2+n_chain1+n_chain2)
+
+
+        H, edges = self.histogram2D(matrix[:,:2], matrix[:,2:], n_chain, bins = n_grid, v_min = v_min, v_max = v_max)
+        H = np.rot90(H)
+        H[H==0] = np.nan
+
+        return H, edges
+
 
 
 
@@ -1715,151 +2045,6 @@ class analysis:
 
 
 
-    ################## Code related to order parameters ##########################
-
-    # Given a list of the shape [C, Hx, Hy, Hz], gets the vectos contecting teh hydrogen ti the C and compute the indivifual cos^2theta) for each carbon for each lipid in the original selection (must be called after individual_order_sn1 or ns2
-    @staticmethod
-    def get_individual(lista):
-        angles = [] # Store the angles
-
-        for i in (range(len(lista)-1)): # Accounts for variable number of list (Change if the carbon has or not double bonds)
-            vectores = lista[i+1].positions - lista[0].positions # Hidrogen - Carbons; output of shape (n_lipids, 3)
-            costheta = vectores[:,2]**2/np.linalg.norm(vectores, axis = 1)**2 # Compute the costheta^2
-            angles.append(costheta) # dim (n_lipids,)
-        angles = np.array(angles) # dim ((2 or 3),n_lipids)
-        #print(angles.shape)
-        angles = np.mean(angles, axis = 0) # output is dim n_lipids, it means the cos^2(theta) or the Carbon passed for each lipid
-        return angles
-
-
-
-
-    # Get the cos^2(theta) for each carbon in the selection, for sn1
-
-    def individual_order_sn1(self, sel, lipid, n_chain):
-        # Define list to store the chain cos^2(theta)
-        chains = []
-
-        # Loop over carbons
-        for i in range(n_chain):
-            # Define selections for H and C in the chain
-            selections = [
-                            f"name C3{i+2}",
-                            f"name H{i+2}X and not name HX",
-                            f"name H{i+2}Y and not name HY",
-                            f"name H{i+2}Z and not name HZ"
-                        ]
-            #print(selections)
-
-
-            # Define a list to store atoms
-            lista = []
-
-            for selection in selections:
-                atoms = sel.select_atoms(selection)
-
-
-                if atoms.n_atoms != 0:
-                    lista.append(atoms)
-            # Call get_individual that computes the cos^2(theta) for each carbon.
-            chains.append(self.get_individual(lista))
-        chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
-        return chains
-
-
-
-
-
-    # Get the cos^2(theta) for each carbon in the selection, for sn2
-
-    def individual_order_sn2(self, sel, lipid, n_chain):
-        # Define list to store the chain cos^2(theta)
-        chains = []
-
-        # Loop over carbons
-        max_v = 0
-        for i in range(n_chain):
-            # Define selections for H and C in the chain
-            selections = [
-                            f"name C2{i+2}",
-                            f"name H{i+2}R and not name HR",
-                            f"name H{i+2}S and not name HS",
-                            f"name H{i+2}T and not name HT"
-                        ]
-            if lipid == "POPE" or lipid == "POPS":
-                if selections[0] == "name C29":
-                    selections[1] = "name H91"
-                if selections[0] == "name C210":
-                    selections[1] = "name H101"
-            # Define a list to store atoms
-            lista = []
-
-            for selection in selections:
-                atoms = sel.select_atoms(selection)
-
-
-                if atoms.n_atoms != 0:
-                    lista.append(atoms)
-            # Call get_individual that computes the cos^2(theta) for each carbon.
-            angles = self.get_individual(lista)
-            if len(angles) > max_v:
-                max_v = len(angles)
-            chains.append(angles)
-
-        #for i in range(len(chains)):
-        #    print(len(chains[i]))
-        #    while len(chains[i]) < max_v:
-        #        chain[i].append(np.nan)
-
-        chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
-        #print("Individual_order_sn2:",chains.shape )
-        return chains
-
-
-
-
-
-
-
-    @staticmethod
-    def count_order(data, min_lenght, n_chain):
-        columns = ["index"]
-        carbons_sn2 = False
-        try:
-            carbons_sn1 = [f"sn1-{i+2}" for i in range(n_chain[0]) ]
-            carbons_sn2 = [f"sn2-{i+2}" for i in range(n_chain[1])]
-            columns = columns + carbons_sn1 + carbons_sn2
-        except:
-            carbons_sn1 = [f"sn1-{i+2}" for i in range(n_chain) ]
-            columns = columns + carbons_sn1
-
-
-        df = pd.DataFrame(data, columns = columns)
-        result = []
-
-        for i in range(min_lenght):
-            temp = df[df["index"] == i]
-            if len(temp) > 0 :
-                sn1 = temp[carbons_sn1]
-                sn1 = sn1.mean()
-                sn1 = 1.5 * sn1 - 0.5
-                sn1 = sn1.abs()
-                sn1 = sn1.mean()
-                final = sn1
-                if carbons_sn2:
-                    sn2 = temp[carbons_sn2]
-                    sn2 = sn2.mean()
-                    sn2 = 1.5 * sn2 - 0.5
-                    sn2 = sn2.abs()
-                    sn2 = sn2.mean()
-
-                    final = (final + sn2)*0.5
-                result.append([i,final])
-            else:
-                result.append([i,0])
-        result = np.array(result)
-        result = result[:,1]
-        return result
 
 
 
@@ -1940,182 +2125,6 @@ class analysis:
 
 
 
-
-
-
-
-    # Method to average vector to pseudovector program
-    @staticmethod
-    def average_vector(data, min_lenght):
-        columns = ["index", "x", "y", "z"] # Data expected is an np array with columns ["index", "x", "y", "z"]
-
-        df = pd.DataFrame(data, columns = columns)
-        result = []
-
-        for i in range(min_lenght):
-            temp = df[df["index"] == i]
-            if len(temp) > 0 :
-                bin_vect = temp[columns[1:]]
-                bin_vect = bin_vect.mean()
-                result.append(bin_vect.to_list())
-            else:
-                result.append([np.nan, np.nan, np.nan])
-        result = np.array(result)
-
-        return result
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # Computes the average vector for each bin, sample are the raw x,y positions and weights are the vectors related to the head
-    def pseudohistogram2D(self,sample1, weights, bins = 10, v_min = None, v_max = None):
-        if v_min == None:
-            v_min = np.min(sample1)
-        if v_max == None:
-            v_max = np.max(sample1)
-
-        #print(v_min, v_max)
-        nbin = np.empty(2,np.intp)
-        edges = 2*[None]
-
-        for i in range(2):
-            edges[i] = np.linspace(v_min, v_max, bins +1)
-            nbin[i] = len(edges[i]) + 1
-
-        Ncount = (tuple(np.searchsorted(edges[i], sample1[:,i], side = "right") for i in range(2)))
-
-        for i in range(2):
-            on_edge = (sample1[:,i] == edges[i][-1])
-            Ncount[i][on_edge] -= 1
-
-
-        xy = np.ravel_multi_index(Ncount, nbin)
-        xy_test = xy.reshape(-1,1)
-
-        xy_test = np.concatenate((xy_test, weights), axis = 1)
-        hist = self.average_vector(xy_test, nbin.prod())
-        nbin = (nbin[0], nbin[1], 3)
-        hist = hist.reshape(nbin)
-        hist = hist.astype(float, casting = "safe")
-        core = 2*(slice(1,-1),)
-        hist = hist[core]
-
-        return hist, edges
-
-
-
-
-
-
-
-
-
-
-    # Computes teh histogram of the average order parameters in each bin
-    def histogram2D(self,sample1, weights, n_chain, bins = 10, v_min = None, v_max = None):
-        if v_min == None:
-            v_min = np.min(sample1)
-        if v_max == None:
-            v_max = np.max(sample1)
-
-        #print(v_min, v_max)
-        nbin = np.empty(2,np.intp)
-        edges = 2*[None]
-
-        for i in range(2):
-            edges[i] = np.linspace(v_min, v_max, bins +1)
-            nbin[i] = len(edges[i]) + 1
-
-        Ncount = (tuple(np.searchsorted(edges[i], sample1[:,i], side = "right") for i in range(2)))
-
-        for i in range(2):
-            on_edge = (sample1[:,i] == edges[i][-1])
-            Ncount[i][on_edge] -= 1
-
-
-        xy = np.ravel_multi_index(Ncount, nbin)
-        xy_test = xy.reshape(-1,1)
-
-        xy_test = np.concatenate((xy_test, weights), axis = 1)
-
-        hist = self.count_order(xy_test, nbin.prod(), n_chain)
-        hist = hist.reshape(nbin)
-        hist = hist.astype(float, casting = "safe")
-        core = 2*(slice(1,-1),)
-        hist = hist[core]
-
-        return hist, edges
-
-
-
-
-
-
-
-    def order_histogram(self, lipid, layer, n_grid, n_chain,v_min = None, v_max = None, all_p = None, start = None, final = None, step = 1):
-        if all_p == None:
-            all_p = self.all_p
-        if start == None:
-            start = self.start
-        if final == None:
-            final = self.final
-
-        if layer == "top":
-            sign = " > "
-        elif layer == "bot":
-            sign = " < "
-
-        try:
-            n_chain1 = n_chain[0]
-            n_chain2 = n_chain[1]
-        except:
-            n_chain1 = n_chain
-            n_chain2 = 0
-
-        matrix = [] # this will store a matrix of the shape (2+n_chain,
-
-        for ts in self.u.trajectory[start:final:step]:
-            z = all_p.positions[:,2]
-            z_mean = z.mean() # get middel of the membrane
-
-            #Pick atoms in the layer
-            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]}) and prop z {sign} {z_mean})")
-            only_p = layer.select_atoms(f"name {self.working_lip[lipid]}")
-            positions = only_p.positions[:,:2]
-            angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
-            angles_sn1 = angles_sn1.T
-            to_write = np.concatenate([positions, angles_sn1], axis = 1)
-            if n_chain2 != 0:
-                angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
-                angles_sn2 = angles_sn2.T
-                to_write = np.concatenate([to_write, angles_sn2], axis = 1)
-
-            matrix.append(to_write) # Expect dim (n_lipids, 2+n_chain1+n_chain2)
-            #print("Frame:",to_write.shape)
-
-        #matrix = np.array(matrix) # Expect dim (frames, n_lipids, 2+n_chain1+n_chain2)
-        matrix = np.concatenate(matrix, axis = 0) # Expect dim (n_lipids*frames, 2+n_chain1+n_chain2)
-
-
-        H, edges = self.histogram2D(matrix[:,:2], matrix[:,2:], n_chain, bins = n_grid, v_min = v_min, v_max = v_max)
-        H = np.rot90(H)
-        H[H==0] = np.nan
-
-        return H, edges
 
 
 
