@@ -250,6 +250,7 @@ class analysis:
         # Loop over carbons
         for i in range(n_chain):
             # Define selections for H and C in the chain
+            print(f"Value of the chain {i} sn1")
             selections = [
                             f"name C3{i+2}",
                             f"name H{i+2}X and not name HX",
@@ -270,7 +271,7 @@ class analysis:
                     lista.append(atoms)
             # Call get_individual that computes the cos^2(theta) for each carbon.
             chains.append(self.get_individual(lista))
-            print(i, self.get_individual(lista).shape, self.get_individual(lista))
+            #print(i, self.get_individual(lista).shape, self.get_individual(lista))
         chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
         return chains
 
@@ -283,18 +284,19 @@ class analysis:
     def individual_order_sn2(self, sel, lipid, n_chain):
         # Define list to store the chain cos^2(theta)
         chains = []
-
+        
         # Loop over carbons
         max_v = 0
         for i in range(n_chain):
             # Define selections for H and C in the chain
+            print(f"Value of the chain {i} sn2")
             selections = [
                             f"name C2{i+2}",
                             f"name H{i+2}R and not name HR",
                             f"name H{i+2}S and not name HS",
                             f"name H{i+2}T and not name HT"
                         ]
-            if lipid == "POPE" or lipid == "POPS":
+            if lipid == "POPE" or lipid == "POPS" or lipid == "POPI1" or lipid == "POPI2":
                 if selections[0] == "name C29":
                     selections[1] = "name H91"
                 if selections[0] == "name C210":
@@ -527,13 +529,13 @@ class analysis:
             z_mean = z.mean() # get middel of the membrane
             #Pick atoms in the layer
             layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
-            print(all_p.n_atoms, z_mean, layer.n_atoms)
+            print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
             
             only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
             angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
-            print(angles_sn1.shape, positions.shape)
+            #print(angles_sn1.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
                 angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
