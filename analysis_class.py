@@ -235,7 +235,7 @@ class analysis:
             costheta = vectores[:,2]**2/np.linalg.norm(vectores, axis = 1)**2 # Compute the costheta^2
             angles.append(costheta) # dim (n_lipids,)
         angles = np.array(angles) # dim ((2 or 3),n_lipids)
-        print("angles", angles.shape)
+        #print("angles", angles.shape)
         angles = np.mean(angles, axis = 0) # output is dim n_lipids, it means the cos^2(theta) or the Carbon passed for each lipid
         return angles
 
@@ -289,7 +289,7 @@ class analysis:
         max_v = 0
         for i in range(n_chain):
             # Define selections for H and C in the chain
-            print(f"Value of the chain {i} sn2")
+            #print(f"Value of the chain {i} sn2")
             selections = [
                             f"name C2{i+2}",
                             f"name H{i+2}R and not name HR",
@@ -529,7 +529,7 @@ class analysis:
             z_mean = z.mean() # get middel of the membrane
             #Pick atoms in the layer
             layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
-            print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
+            #print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
             
             only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
