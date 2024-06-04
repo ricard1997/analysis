@@ -55,7 +55,7 @@ class analysis:
         self.final = final
         self.step = step
         self.lower_lim = None
-        self.upper_lim = None
+        self.topper_lim = None
         self.ha_table = None
         self.p_table = None
 
@@ -130,7 +130,7 @@ class analysis:
                 final = None,
                 step = None,
                 lipid = "DSPC",
-                layer = 'up',
+                layer = 'top',
                 filename = None, include_charge = False):
 
         if start == None:
@@ -154,7 +154,7 @@ class analysis:
 
 
         sign = " > "
-        if layer != "up":
+        if layer != "top":
             sign = " < "
 
 
@@ -212,16 +212,26 @@ class analysis:
                 final = None,
                 step = None,
                 lipids = ["DSPC", "DOPC"],
-                layer = 'up',
+                layer = 'top',
                 filename = None, include_charge = False):
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+        if step == None:
+            step = self.step
         lipid_data_dict = {}
         for lipid in lipids:
-            lipid_data_dict[lipid] = self.surface(start = None,
-                    final = None,
-                    step = None,
+            try:
+                filename = f"{lipid}_{layer}_{start}_{final}.dat"
+                lipid_data_dict[lipid] = pd.read_csv(filename)
+            except:
+                lipid_data_dict[lipid] = self.surface(start = start,
+                    final = final,
+                    step = step,
                     lipid = lipid,
-                    layer = 'up',
-                    filename = None, include_charge = False)
+                    layer = layer,
+                    filename = filename, include_charge = include_charge)
         return lipid_data_dict
 
 ################## Code related to 2D order parameters ##########################
@@ -566,7 +576,7 @@ class analysis:
 
     def surface(self, start = None, final = None, step = None,
                                     lipid = "DSPC",
-                                    layer = 'up',
+                                    layer = 'top',
                                     filename = 'test.dat', include_charge = False):
 #        print(lipid_list)
 
@@ -588,7 +598,7 @@ class analysis:
 
 
         sign = " > "
-        if layer != "up":
+        if layer != "top":
             sign = " < "
         ##### Select all the P atoms to find the middle of the membrane
         all_p = self.all_p
@@ -637,7 +647,7 @@ class analysis:
 
     def surface_vectors(self, start = None, final = None, step = None,
                                     lipid = "DSPC",
-                                    layer = 'up',
+                                    layer = 'top',
                                     multiple_step=None,
                                     n_frames = 100,
                                     filename = None, include_charge = False):
@@ -669,7 +679,7 @@ class analysis:
                         "DODMA": ["name C2", "name N1"],
                         "POPE": ["name P", "name N"],
                         "DSPC": ["name P", "name N"],
-                        "DSPE": ["name P", "name N"], # May update to C2 from the PEGA that is 5 resid far from the original (44->49)
+                        "DSPE": ["name P", "name N"], # May topdate to C2 from the PEGA that is 5 resid far from the original (44->49)
                         "CHL1": ["name C3", "name C17"],
                         }
 
@@ -677,7 +687,7 @@ class analysis:
 
 
         sign = " > "
-        if layer != "up":
+        if layer != "top":
             sign = " < "
         ##### Select all the P atoms to find the middle of the membrane
         all_p = self.all_p
@@ -738,7 +748,7 @@ class analysis:
 
         return pos_data   # Maybe have to change, it does not make sense to return this
 
-    def plot_2dvectors(self, lipid = "DOPS",stage = "touchdown", start = 0, final = -1, layer = "up",filename = None):
+    def plot_2dvectors(self, lipid = "DOPS",stage = "touchbot", start = 0, final = -1, layer = "top",filename = None):
         if filename == None:
             filename = f"pd_{lipid}_{start}.dat"
         try:
@@ -781,9 +791,9 @@ class analysis:
 
 
 
-        vect1 = vect.groupby(by="id").mean()
+        vect1 = vect.grotopby(by="id").mean()
         vect1["norm"] = np.linalg.norm(vect1[["x", "y", "z"]].values, axis =1)
-        print("Grouped by :", vect1)
+        print("Grotoped by :", vect1)
         vect["norm"] = np.linalg.norm(vect[["x", "y", "z"]].values, axis =1)
         print("Descride vect:", vect.describe())
         print("Describe", vect1.describe())
@@ -885,7 +895,7 @@ class analysis:
 
 
 ##### Plot vector fields and vector for vatious lipids at a time
-    def plot_vector_lipids(self, lipids = ["DOPS"],stage = "touchdown", start = 0, final = -1,output = "field.png", layer = "up", zoom = False, multiple_step = None, n_frames = 100, axis1 = None, axis2 = None, axis3 = None):
+    def plot_vector_lipids(self, lipids = ["DOPS"],stage = "touchbot", start = 0, final = -1,output = "field.png", layer = "top", zoom = False, multiple_step = None, n_frames = 100, axis1 = None, axis2 = None, axis3 = None):
 
         dict_data = {}
         print(multiple_step, n_frames)
@@ -1022,7 +1032,7 @@ class analysis:
         count = 0
         for lipid in lipids:
             vect = dict_data[lipid].copy()
-            vect = vect.groupby(by="id").mean()
+            vect = vect.grotopby(by="id").mean()
             plt.quiver(vect["x_0"],
                     vect["y_0"],
                     vect["x"],
@@ -1314,7 +1324,7 @@ class analysis:
         resids = data_df["resname"].tolist()
         ha_com, p_pos  = self.rna_positions(ha_file = f"{filename}ha_com.dat", p_file = f"{filename}p_pos.dat")
         #print(ha_com.columns)
-        means = ha_com.groupby("resid").mean()
+        means = ha_com.grotopby("resid").mean()
         return means.loc[resids], ha_com
 
 
@@ -1709,8 +1719,8 @@ class analysis:
 	        sns.kdeplot(data = temp, x = 'x', y = 'y', fill = True, color=self.color[count], alpha = 0.5)
 	        count += 1
         plt.xlabel('x $[\\AA]$')
-        plt.xlim(self.lower_lim,self.upper_lim)
-        plt.ylim(self.lower_lim,self.upper_lim)
+        plt.xlim(self.lower_lim,self.topper_lim)
+        plt.ylim(self.lower_lim,self.topper_lim)
 
         legend_handles = []
         for i in range(len(nts_list[:6])):
@@ -1745,13 +1755,13 @@ class analysis:
         y_values = contour_lines_1[0].get_paths()[0].vertices[:,1]
         print(data_df, len(contour_lines_1))
         xlim_low  = np.min(x_values)
-        xlim_up = np.max(x_values)
+        xlim_top = np.max(x_values)
         ylim_low  = np.min(y_values)
-        ylim_up = np.max(y_values)
+        ylim_top = np.max(y_values)
         #if self.test:
         self.lower_lim = min(xlim_low, ylim_low) - 4
-        self.upper_lim = max(xlim_up, ylim_up) + 4
-        return [self.lower_lim, self.upper_lim]
+        self.topper_lim = max(xlim_top, ylim_top) + 4
+        return [self.lower_lim, self.topper_lim]
 
 
 
@@ -1767,7 +1777,7 @@ class analysis:
                                         color = 'black',
                                         alpha = 0.8,
                                         ax = ax)
-        print(f"Here I write the origin of the limits {self.lower_lim}, {self.upper_lim}")
+        print(f"Here I write the origin of the limits {self.lower_lim}, {self.topper_lim}")
 
 	    #df_1 = df.sort_values(by='Mean')
         nts_list = nucl['resname'].iloc[:7].tolist()
@@ -1809,11 +1819,11 @@ class analysis:
 	        count += 1
 
         ax.set_xlabel('x $[\\AA]$')
-        ax.set_xlim(self.lower_lim,self.upper_lim)
-        ax.set_ylim(self.lower_lim,self.upper_lim)
+        ax.set_xlim(self.lower_lim,self.topper_lim)
+        ax.set_ylim(self.lower_lim,self.topper_lim)
 
-        plt.xlim(self.lower_lim, self.upper_lim)
-        plt.ylim(self.lower_lim, self.upper_lim)
+        plt.xlim(self.lower_lim, self.topper_lim)
+        plt.ylim(self.lower_lim, self.topper_lim)
 
         ax.set_ylabel('y $[\\AA]$')
 
@@ -1846,15 +1856,15 @@ class analysis:
             # If lipids has not cross the periodic box, plot it
                 kde = sns.kdeplot(data = temp, x =     'x', y = 'y', fill = True, alpha = 0.5, color='green', ax = ax)
                 #print("Added to ax")
-        #ax.set_ylim(self.lower_lim, self.upper_lim)
-        #ax.set_xlim(self.lower_lim, self.upper_lim)
-        #plt.xlim(self.lower_lim, self.upper_lim)
-        #plt.ylim(self.lower_lim, self.upper_lim)
+        #ax.set_ylim(self.lower_lim, self.topper_lim)
+        #ax.set_xlim(self.lower_lim, self.topper_lim)
+        #plt.xlim(self.lower_lim, self.topper_lim)
+        #plt.ylim(self.lower_lim, self.topper_lim)
         title = filename.split("/")
         title = title[-1]
         title = title.replace("cumulative", "")
         title = title.replace("top.dat", "")
-        title = title.replace("up.dat", "")
+        title = title.replace("top.dat", "")
         title = title.replace("bot.dat", "")
         ax.set_title(title)
 
@@ -1891,8 +1901,8 @@ class analysis:
             for filename in lipids_paths:
                 self.lipid_background(filename, ax[i])
                 self.full_contour_ax(self.p_pos, self.p_table, ax[i])
-                ax[i].set_ylim(self.lower_lim,self.upper_lim)
-                ax[i].set_xlim(self.lower_lim,self.upper_lim)
+                ax[i].set_ylim(self.lower_lim,self.topper_lim)
+                ax[i].set_xlim(self.lower_lim,self.topper_lim)
                 i += 1
 
 
@@ -1954,9 +1964,9 @@ class analysis:
             for filename in lipids_paths:
                 self.lipid_background(filename, ax[i])
                 self.full_contour_ax(self.ha_com, self.ha_table, ax[i])
-                print(f"############ Here I put the lipids {self.lower_lim}, {self.upper_lim}")
-                ax[i].set_ylim(self.lower_lim, self.upper_lim)
-                ax[i].set_xlim(self.lower_lim, self.upper_lim)
+                print(f"############ Here I put the lipids {self.lower_lim}, {self.topper_lim}")
+                ax[i].set_ylim(self.lower_lim, self.topper_lim)
+                ax[i].set_xlim(self.lower_lim, self.topper_lim)
                 i += 1
 
 
@@ -2015,7 +2025,7 @@ class analysis:
 
 
         #print(temp)
-            ax1[count1][count].plot(temp['resname'], temp[columns[identity]], color= 'tab:blue', marker = 'o', label = 'touchdown')
+            ax1[count1][count].plot(temp['resname'], temp[columns[identity]], color= 'tab:blue', marker = 'o', label = 'touchbot')
             ax1[count1][count].plot(temp1['resname'], temp1[columns[identity]], color= 'tab:orange', marker = 'o', label = 'highest')
             ax1[count1][count].tick_params(axis='x', rotation=45)
             print(count1, count)
@@ -2055,13 +2065,13 @@ class analysis:
 
 
     @staticmethod
-    def radial_tilt(file_closest = "full_ha_table.dat",layer = "up",ha_com = "ha_com.dat",  file_surf_vect = "pd_DSPC_240.dat", filename = "test.png", ax_p = None):
+    def radial_tilt(file_closest = "full_ha_table.dat",layer = "top",ha_com = "ha_com.dat",  file_surf_vect = "pd_DSPC_240.dat", filename = "test.png", ax_p = None):
         table_closest = pd.read_csv(file_closest)
         data_tilt = pd.read_csv(file_surf_vect)
         ha_com = pd.read_csv(ha_com)
         columns_ha = list(ha_com.columns)
         ha_com = ha_com[columns_ha[1:]]
-        ha_com = ha_com.groupby("resid").mean()
+        ha_com = ha_com.grotopby("resid").mean()
 
         table_closest = table_closest.iloc[:10]
         axis = ["x", "y", "z"]
@@ -2070,7 +2080,7 @@ class analysis:
         data_tilt["norm"] = np.linalg.norm(data_tilt[axis].values, axis = 1)
         for ax in axis:
             data_tilt[ax] = data_tilt[ax]/data_tilt["norm"]
-        if layer == "down":
+        if layer == "bot":
             data_tilt["z"] = -data_tilt["z"]
         # Get the z axis
         data_tilt["angle"] = np.arccos(data_tilt["z"])
