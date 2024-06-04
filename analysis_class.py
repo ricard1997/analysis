@@ -55,7 +55,7 @@ class analysis:
         self.final = final
         self.step = step
         self.lower_lim = None
-        self.topper_lim = None
+        self.upper_lim = None
         self.ha_table = None
         self.p_table = None
 
@@ -791,7 +791,7 @@ class analysis:
 
 
 
-        vect1 = vect.grotopby(by="id").mean()
+        vect1 = vect.groupby(by="id").mean()
         vect1["norm"] = np.linalg.norm(vect1[["x", "y", "z"]].values, axis =1)
         print("Grotoped by :", vect1)
         vect["norm"] = np.linalg.norm(vect[["x", "y", "z"]].values, axis =1)
@@ -1032,7 +1032,7 @@ class analysis:
         count = 0
         for lipid in lipids:
             vect = dict_data[lipid].copy()
-            vect = vect.grotopby(by="id").mean()
+            vect = vect.groupby(by="id").mean()
             plt.quiver(vect["x_0"],
                     vect["y_0"],
                     vect["x"],
@@ -1324,7 +1324,7 @@ class analysis:
         resids = data_df["resname"].tolist()
         ha_com, p_pos  = self.rna_positions(ha_file = f"{filename}ha_com.dat", p_file = f"{filename}p_pos.dat")
         #print(ha_com.columns)
-        means = ha_com.grotopby("resid").mean()
+        means = ha_com.groupby("resid").mean()
         return means.loc[resids], ha_com
 
 
@@ -1719,8 +1719,8 @@ class analysis:
 	        sns.kdeplot(data = temp, x = 'x', y = 'y', fill = True, color=self.color[count], alpha = 0.5)
 	        count += 1
         plt.xlabel('x $[\\AA]$')
-        plt.xlim(self.lower_lim,self.topper_lim)
-        plt.ylim(self.lower_lim,self.topper_lim)
+        plt.xlim(self.lower_lim,self.upper_lim)
+        plt.ylim(self.lower_lim,self.upper_lim)
 
         legend_handles = []
         for i in range(len(nts_list[:6])):
@@ -1760,8 +1760,8 @@ class analysis:
         ylim_top = np.max(y_values)
         #if self.test:
         self.lower_lim = min(xlim_low, ylim_low) - 4
-        self.topper_lim = max(xlim_top, ylim_top) + 4
-        return [self.lower_lim, self.topper_lim]
+        self.upper_lim = max(xlim_top, ylim_top) + 4
+        return [self.lower_lim, self.upper_lim]
 
 
 
@@ -1777,7 +1777,7 @@ class analysis:
                                         color = 'black',
                                         alpha = 0.8,
                                         ax = ax)
-        print(f"Here I write the origin of the limits {self.lower_lim}, {self.topper_lim}")
+        print(f"Here I write the origin of the limits {self.lower_lim}, {self.upper_lim}")
 
 	    #df_1 = df.sort_values(by='Mean')
         nts_list = nucl['resname'].iloc[:7].tolist()
@@ -1819,11 +1819,11 @@ class analysis:
 	        count += 1
 
         ax.set_xlabel('x $[\\AA]$')
-        ax.set_xlim(self.lower_lim,self.topper_lim)
-        ax.set_ylim(self.lower_lim,self.topper_lim)
+        ax.set_xlim(self.lower_lim,self.upper_lim)
+        ax.set_ylim(self.lower_lim,self.upper_lim)
 
-        plt.xlim(self.lower_lim, self.topper_lim)
-        plt.ylim(self.lower_lim, self.topper_lim)
+        plt.xlim(self.lower_lim, self.upper_lim)
+        plt.ylim(self.lower_lim, self.upper_lim)
 
         ax.set_ylabel('y $[\\AA]$')
 
@@ -1856,10 +1856,10 @@ class analysis:
             # If lipids has not cross the periodic box, plot it
                 kde = sns.kdeplot(data = temp, x =     'x', y = 'y', fill = True, alpha = 0.5, color='green', ax = ax)
                 #print("Added to ax")
-        #ax.set_ylim(self.lower_lim, self.topper_lim)
-        #ax.set_xlim(self.lower_lim, self.topper_lim)
-        #plt.xlim(self.lower_lim, self.topper_lim)
-        #plt.ylim(self.lower_lim, self.topper_lim)
+        #ax.set_ylim(self.lower_lim, self.upper_lim)
+        #ax.set_xlim(self.lower_lim, self.upper_lim)
+        #plt.xlim(self.lower_lim, self.upper_lim)
+        #plt.ylim(self.lower_lim, self.upper_lim)
         title = filename.split("/")
         title = title[-1]
         title = title.replace("cumulative", "")
@@ -1901,8 +1901,8 @@ class analysis:
             for filename in lipids_paths:
                 self.lipid_background(filename, ax[i])
                 self.full_contour_ax(self.p_pos, self.p_table, ax[i])
-                ax[i].set_ylim(self.lower_lim,self.topper_lim)
-                ax[i].set_xlim(self.lower_lim,self.topper_lim)
+                ax[i].set_ylim(self.lower_lim,self.upper_lim)
+                ax[i].set_xlim(self.lower_lim,self.upper_lim)
                 i += 1
 
 
@@ -1964,9 +1964,9 @@ class analysis:
             for filename in lipids_paths:
                 self.lipid_background(filename, ax[i])
                 self.full_contour_ax(self.ha_com, self.ha_table, ax[i])
-                print(f"############ Here I put the lipids {self.lower_lim}, {self.topper_lim}")
-                ax[i].set_ylim(self.lower_lim, self.topper_lim)
-                ax[i].set_xlim(self.lower_lim, self.topper_lim)
+                print(f"############ Here I put the lipids {self.lower_lim}, {self.upper_lim}")
+                ax[i].set_ylim(self.lower_lim, self.upper_lim)
+                ax[i].set_xlim(self.lower_lim, self.upper_lim)
                 i += 1
 
 
@@ -2071,7 +2071,7 @@ class analysis:
         ha_com = pd.read_csv(ha_com)
         columns_ha = list(ha_com.columns)
         ha_com = ha_com[columns_ha[1:]]
-        ha_com = ha_com.grotopby("resid").mean()
+        ha_com = ha_com.groupby("resid").mean()
 
         table_closest = table_closest.iloc[:10]
         axis = ["x", "y", "z"]
