@@ -153,8 +153,9 @@ class analysis:
         print(f"Writing under the name of {filename}")
 
 
-        sign = " > "
-        if layer != "top":
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
             sign = " < "
 
 
@@ -170,7 +171,10 @@ class analysis:
             mean_z = positions.mean()
 
             # Selects the lipid head and of the working lipid
-            selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
+            if layer == "both":
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']})"
+            else:
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
 
 
             # Find the positions of the P atoms
@@ -188,7 +192,7 @@ class analysis:
             atom_resid = atom_resid[:,np.newaxis]
 
             atom_pos = np.concatenate((atom_pos, atom_resid), axis = 1)
-            atom_pos[:,2] = np.abs(atom_pos[:,2] - mean_z)
+            atom_pos[:,2] = np.abs(atom_pos[:,2]-z_mean)
 
             pos_data.append(atom_pos)
 
@@ -222,11 +226,12 @@ class analysis:
             step = self.step
         lipid_data_dict = {}
         for lipid in lipids:
-            try:
-                filename = f"{lipid}_{layer}_{start}_{final}.dat"
-                lipid_data_dict[lipid] = pd.read_csv(filename)
-            except:
-                lipid_data_dict[lipid] = self.surface(start = start,
+            #try:
+            #    filename = f"{lipid}__{layer}_{start}_{final}.dat"
+            #    lipid_data_dict[lipid] = pd.read_csv(filename)
+            #except:
+            filename = f"{lipid}_{layer}_{start}_{final}.dat"
+            lipid_data_dict[lipid] = self.surface(start = start,
                     final = final,
                     step = step,
                     lipid = lipid,
@@ -538,7 +543,10 @@ class analysis:
             z = all_p.positions[:,2]
             z_mean = z.mean() # get middel of the membrane
             #Pick atoms in the layer
-            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
+            if layer == "both":
+                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}))")
+            else:
+                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
             #print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
             
             only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
