@@ -531,6 +531,7 @@ class analysis:
             positions = only_p.positions[:,:2]
             angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
+            print(angles_sn1.T.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
                 angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
