@@ -130,7 +130,7 @@ class analysis:
                 final = None,
                 step = None,
                 lipid = "DSPC",
-                layer = 'up',
+                layer = 'top',
                 filename = None, include_charge = False):
 
         if start == None:
@@ -153,8 +153,9 @@ class analysis:
         print(f"Writing under the name of {filename}")
 
 
-        sign = " > "
-        if layer != "up":
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
             sign = " < "
 
 
@@ -170,7 +171,10 @@ class analysis:
             mean_z = positions.mean()
 
             # Selects the lipid head and of the working lipid
-            selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
+            if layer == "both":
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']})"
+            else:
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
 
 
             # Find the positions of the P atoms
@@ -188,7 +192,7 @@ class analysis:
             atom_resid = atom_resid[:,np.newaxis]
 
             atom_pos = np.concatenate((atom_pos, atom_resid), axis = 1)
-            atom_pos[:,2] = np.abs(atom_pos[:,2] - mean_z)
+            atom_pos[:,2] = np.abs(atom_pos[:,2]-z_mean)
 
             pos_data.append(atom_pos)
 
@@ -212,16 +216,27 @@ class analysis:
                 final = None,
                 step = None,
                 lipids = ["DSPC", "DOPC"],
-                layer = 'up',
+                layer = 'top',
                 filename = None, include_charge = False):
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+        if step == None:
+            step = self.step
         lipid_data_dict = {}
         for lipid in lipids:
-            lipid_data_dict[lipid] = self.surface(start = None,
-                    final = None,
-                    step = None,
+            #try:
+            #    filename = f"{lipid}__{layer}_{start}_{final}.dat"
+            #    lipid_data_dict[lipid] = pd.read_csv(filename)
+            #except:
+            filename = f"{lipid}_{layer}_{start}_{final}.dat"
+            lipid_data_dict[lipid] = self.surface(start = start,
+                    final = final,
+                    step = step,
                     lipid = lipid,
-                    layer = 'up',
-                    filename = None, include_charge = False)
+                    layer = layer,
+                    filename = filename, include_charge = include_charge)
         return lipid_data_dict
 
 ################## Code related to 2D order parameters ##########################
@@ -235,7 +250,7 @@ class analysis:
             costheta = vectores[:,2]**2/np.linalg.norm(vectores, axis = 1)**2 # Compute the costheta^2
             angles.append(costheta) # dim (n_lipids,)
         angles = np.array(angles) # dim ((2 or 3),n_lipids)
-        #print(angles.shape)
+        #print("angles", angles.shape)
         angles = np.mean(angles, axis = 0) # output is dim n_lipids, it means the cos^2(theta) or the Carbon passed for each lipid
         return angles
 
@@ -250,6 +265,7 @@ class analysis:
         # Loop over carbons
         for i in range(n_chain):
             # Define selections for H and C in the chain
+            print(f"Value of the chain {i} sn1")
             selections = [
                             f"name C3{i+2}",
                             f"name H{i+2}X and not name HX",
@@ -270,6 +286,7 @@ class analysis:
                     lista.append(atoms)
             # Call get_individual that computes the cos^2(theta) for each carbon.
             chains.append(self.get_individual(lista))
+            #print(i, self.get_individual(lista).shape, self.get_individual(lista))
         chains = np.array(chains) # Expect array of dim (n_chain, n_lipids)
         return chains
 
@@ -282,18 +299,19 @@ class analysis:
     def individual_order_sn2(self, sel, lipid, n_chain):
         # Define list to store the chain cos^2(theta)
         chains = []
-
+        
         # Loop over carbons
         max_v = 0
         for i in range(n_chain):
             # Define selections for H and C in the chain
+            #print(f"Value of the chain {i} sn2")
             selections = [
                             f"name C2{i+2}",
                             f"name H{i+2}R and not name HR",
                             f"name H{i+2}S and not name HS",
                             f"name H{i+2}T and not name HT"
                         ]
-            if lipid == "POPE" or lipid == "POPS":
+            if lipid == "POPE" or lipid == "POPS" or lipid == "POPI1" or lipid == "POPI2":
                 if selections[0] == "name C29":
                     selections[1] = "name H91"
                 if selections[0] == "name C210":
@@ -524,14 +542,20 @@ class analysis:
         for ts in self.u.trajectory[start:final:step]:
             z = all_p.positions[:,2]
             z_mean = z.mean() # get middel of the membrane
-
             #Pick atoms in the layer
-            layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]}) and prop z {sign} {z_mean})")
-            only_p = layer.select_atoms(f"name {self.working_lip[lipid]}")
+            if layer == "both":
+                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}))")
+            else:
+                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
+            #print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
+            
+            only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
             angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
-            print(angles_sn1.T.shape, positions.shape)
+
+            #print(angles_sn1.T.shape, positions.shape)
+            #print(angles_sn1.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
                 angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
@@ -562,7 +586,7 @@ class analysis:
 
     def surface(self, start = None, final = None, step = None,
                                     lipid = "DSPC",
-                                    layer = 'up',
+                                    layer = 'top',
                                     filename = 'test.dat', include_charge = False):
 #        print(lipid_list)
 
@@ -584,7 +608,7 @@ class analysis:
 
 
         sign = " > "
-        if layer != "up":
+        if layer != "top":
             sign = " < "
         ##### Select all the P atoms to find the middle of the membrane
         all_p = self.all_p
@@ -633,7 +657,7 @@ class analysis:
 
     def surface_vectors(self, start = None, final = None, step = None,
                                     lipid = "DSPC",
-                                    layer = 'up',
+                                    layer = 'top',
                                     multiple_step=None,
                                     n_frames = 100,
                                     filename = None, include_charge = False):
@@ -665,7 +689,7 @@ class analysis:
                         "DODMA": ["name C2", "name N1"],
                         "POPE": ["name P", "name N"],
                         "DSPC": ["name P", "name N"],
-                        "DSPE": ["name P", "name N"], # May update to C2 from the PEGA that is 5 resid far from the original (44->49)
+                        "DSPE": ["name P", "name N"], # May topdate to C2 from the PEGA that is 5 resid far from the original (44->49)
                         "CHL1": ["name C3", "name C17"],
                         }
 
@@ -673,7 +697,7 @@ class analysis:
 
 
         sign = " > "
-        if layer != "up":
+        if layer != "top":
             sign = " < "
         ##### Select all the P atoms to find the middle of the membrane
         all_p = self.all_p
@@ -734,7 +758,7 @@ class analysis:
 
         return pos_data   # Maybe have to change, it does not make sense to return this
 
-    def plot_2dvectors(self, lipid = "DOPS",stage = "touchdown", start = 0, final = -1, layer = "up",filename = None):
+    def plot_2dvectors(self, lipid = "DOPS",stage = "touchbot", start = 0, final = -1, layer = "top",filename = None):
         if filename == None:
             filename = f"pd_{lipid}_{start}.dat"
         try:
@@ -779,7 +803,7 @@ class analysis:
 
         vect1 = vect.groupby(by="id").mean()
         vect1["norm"] = np.linalg.norm(vect1[["x", "y", "z"]].values, axis =1)
-        print("Grouped by :", vect1)
+        print("Grotoped by :", vect1)
         vect["norm"] = np.linalg.norm(vect[["x", "y", "z"]].values, axis =1)
         print("Descride vect:", vect.describe())
         print("Describe", vect1.describe())
@@ -881,7 +905,7 @@ class analysis:
 
 
 ##### Plot vector fields and vector for vatious lipids at a time
-    def plot_vector_lipids(self, lipids = ["DOPS"],stage = "touchdown", start = 0, final = -1,output = "field.png", layer = "up", zoom = False, multiple_step = None, n_frames = 100, axis1 = None, axis2 = None, axis3 = None):
+    def plot_vector_lipids(self, lipids = ["DOPS"],stage = "touchbot", start = 0, final = -1,output = "field.png", layer = "top", zoom = False, multiple_step = None, n_frames = 100, axis1 = None, axis2 = None, axis3 = None):
 
         dict_data = {}
         print(multiple_step, n_frames)
@@ -1741,12 +1765,12 @@ class analysis:
         y_values = contour_lines_1[0].get_paths()[0].vertices[:,1]
         print(data_df, len(contour_lines_1))
         xlim_low  = np.min(x_values)
-        xlim_up = np.max(x_values)
+        xlim_top = np.max(x_values)
         ylim_low  = np.min(y_values)
-        ylim_up = np.max(y_values)
+        ylim_top = np.max(y_values)
         #if self.test:
         self.lower_lim = min(xlim_low, ylim_low) - 4
-        self.upper_lim = max(xlim_up, ylim_up) + 4
+        self.upper_lim = max(xlim_top, ylim_top) + 4
         return [self.lower_lim, self.upper_lim]
 
 
@@ -1850,7 +1874,7 @@ class analysis:
         title = title[-1]
         title = title.replace("cumulative", "")
         title = title.replace("top.dat", "")
-        title = title.replace("up.dat", "")
+        title = title.replace("top.dat", "")
         title = title.replace("bot.dat", "")
         ax.set_title(title)
 
@@ -2011,7 +2035,7 @@ class analysis:
 
 
         #print(temp)
-            ax1[count1][count].plot(temp['resname'], temp[columns[identity]], color= 'tab:blue', marker = 'o', label = 'touchdown')
+            ax1[count1][count].plot(temp['resname'], temp[columns[identity]], color= 'tab:blue', marker = 'o', label = 'touchbot')
             ax1[count1][count].plot(temp1['resname'], temp1[columns[identity]], color= 'tab:orange', marker = 'o', label = 'highest')
             ax1[count1][count].tick_params(axis='x', rotation=45)
             print(count1, count)
@@ -2051,7 +2075,7 @@ class analysis:
 
 
     @staticmethod
-    def radial_tilt(file_closest = "full_ha_table.dat",layer = "up",ha_com = "ha_com.dat",  file_surf_vect = "pd_DSPC_240.dat", filename = "test.png", ax_p = None):
+    def radial_tilt(file_closest = "full_ha_table.dat",layer = "top",ha_com = "ha_com.dat",  file_surf_vect = "pd_DSPC_240.dat", filename = "test.png", ax_p = None):
         table_closest = pd.read_csv(file_closest)
         data_tilt = pd.read_csv(file_surf_vect)
         ha_com = pd.read_csv(ha_com)
@@ -2066,7 +2090,7 @@ class analysis:
         data_tilt["norm"] = np.linalg.norm(data_tilt[axis].values, axis = 1)
         for ax in axis:
             data_tilt[ax] = data_tilt[ax]/data_tilt["norm"]
-        if layer == "down":
+        if layer == "bot":
             data_tilt["z"] = -data_tilt["z"]
         # Get the z axis
         data_tilt["angle"] = np.arccos(data_tilt["z"])
