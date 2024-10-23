@@ -1,2 +1,6 @@
 *.dat
 *.png
+*.gro
+*.xtc
+*.npz
+*.lock
