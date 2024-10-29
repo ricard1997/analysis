@@ -96,6 +96,7 @@ class twod_analysis:
 
         if guess_chain_l: # Guess the chain lenght of lipids. Chain sn2 start with C2 and chain sn1 start with C3
             self.chain_info = {}
+            self.non_polar_dict = {}
             for lipid in self.lipid_list:
                 first_lipid = self.memb.select_atoms(f"resname {lipid}").resids[0]
                 actual_sn1 = self.memb.select_atoms(f"resid {first_lipid} and name C2*")
@@ -106,9 +107,11 @@ class twod_analysis:
 
                 if lipid == "CHL1":
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and not (name O3 or name H3')")
-
                 else:
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and (name C3* or name H*Y or name H*X or name H*Z  or name C2* or name H*R or name H*S or name H*T) and not (name C3 or name HY or name HX or name HZ  or name C2 or name HR or name HS or name HT)")
+                self.non_polar_dict[lipid] = list(non_polar.names)
+            print(self.non_polar_dict)
+
 
         self.all_head = self.u.select_atoms(self.build_resname(self.lipid_list) + " and name P")
         self.start = 0
@@ -715,6 +718,7 @@ class twod_analysis:
 
 
         lipid_list = list(self.lipid_list)
+        non_polarity = self.non_polar_dict
 
 
         print("######### Running packing defects function ########## ")
