@@ -299,7 +299,7 @@ class analysis:
     def individual_order_sn2(self, sel, lipid, n_chain):
         # Define list to store the chain cos^2(theta)
         chains = []
-        
+
         # Loop over carbons
         max_v = 0
         for i in range(n_chain):
@@ -548,7 +548,7 @@ class analysis:
             else:
                 layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
             #print("Info:", all_p.n_atoms, z_mean, layer.n_atoms)
-            
+
             only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
             angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)

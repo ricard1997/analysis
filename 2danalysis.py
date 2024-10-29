@@ -21,6 +21,10 @@ class twod_analysis:
                 info = False,
                 guess_chain_l = True,
                 chain_info = None,
+                v_min = 0,
+                v_max = 180,
+                add_radii = False,
+                verbose = False,
             ):
 
 
@@ -34,7 +38,44 @@ class twod_analysis:
         if not lipid_list: # Select only elements of the membrane
             self.memb = self.u.select_atoms("all and not protein and not (resname URA or resname GUA or resname ADE or resname CYT)")
             self.lipid_list = set(self.memb.residues.resnames)
+        else:
+            self.memb = self.u.select_atoms(f"{self.build_resname(list(lipid_list))}")
 
+
+        if add_radii:
+            radii_dict = {"H": 0.7,
+                            "N": 1.85,
+                            "C": 2.06,
+                            "P": 2.15,
+                            "O": 1.65,
+                            }
+            string_array = self.memb.elements
+            radii_array = np.array([radii_dict[element] for element in string_array])
+            self.u.add_TopologyAttr("radii")
+            self.memb.radii = radii_array
+
+            polar_motif = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
+            polar_PS = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
+            polar_PI = "C12 H2 O2 HO2 C13 H3 O3 HO3 C14 H4 O4 HO4 C15 H5 O5 HO5 C16 H6 O6 HO6 C11 H1"
+            polar_PA = "H12 "
+            polar_PC = "N C12 C13 C14 C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C C11 H11A H11B"
+            polar_PE = "N HN1 HN2 HN3 C12 H12A H12B C11 H11A H11B"
+            polar_CHL = "O3 H3'"
+
+
+            #polar_chains = [polar_motif, polar_PS, polar_PI, polar_PA, polar_PC, polar_PE]
+            #polar_atoms = [chain.split() for chain in polar_atoms]
+            dspc = self.memb.select_atoms("(resname DSPC and not (name C3* or name H*X or name H*Y or name C2* or name H*R or name H*S)) or (resname DSPC and(name C3 or name HX or name HY or name C2 or name HR or name HS))")
+            print(set(dspc.atoms.names))
+
+
+        if verbose:
+            print(self.u.atoms.elements, "jere")
+
+
+
+        self.v_min = v_min
+        self.v_max = v_max
         self.working_lip = {
                                 "CHL1" : {"head" :"O3", "charge" : 0},
                                 "DODMA" : {"head" :"N1", "charge" : -0.21},
@@ -50,6 +91,9 @@ class twod_analysis:
                             } #List of known lipids and lipids head people usually use to work
 
         self.chain_info = chain_info
+
+
+
         if guess_chain_l: # Guess the chain lenght of lipids. Chain sn2 start with C2 and chain sn1 start with C3
             self.chain_info = {}
             for lipid in self.lipid_list:
@@ -60,7 +104,16 @@ class twod_analysis:
                 actual_sn2 = actual_sn2.names
                 self.chain_info[lipid] = [len(actual_sn1) - 2, len(actual_sn2) - 2]
 
+                if lipid == "CHL1":
+                    non_polar = self.memb.select_atoms(f"resid {first_lipid} and not (name O3 or name H3')")
+
+                else:
+                    non_polar = self.memb.select_atoms(f"resid {first_lipid} and (name C3* or name H*Y or name H*X or name H*Z  or name C2* or name H*R or name H*S or name H*T) and not (name C3 or name HY or name HX or name HZ  or name C2 or name HR or name HS or name HT)")
+
         self.all_head = self.u.select_atoms(self.build_resname(self.lipid_list) + " and name P")
+        self.start = 0
+        self.final = 100
+        self.step = 1
 
 
     @staticmethod
@@ -393,8 +446,8 @@ class twod_analysis:
             sign = " < "
 
         try:
-            n_chain1 = n_chain[0]
-            n_chain2 = n_chain[1]
+            n_chain1 = n_chain[1]
+            n_chain2 = n_chain[0]
         except:
             n_chain1 = n_chain
             n_chain2 = 0
@@ -403,23 +456,25 @@ class twod_analysis:
         for ts in self.u.trajectory[start:final:step]:
             z = all_head.positions[:,2]
             z_mean = z.mean() # get middel of the membrane
+            print(z_mean)
             #Pick atoms in the layer
+            print(type(layer))
             if layer == "both":
-                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}))")
+                layer_at = self.memb.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}))")
             else:
-                layer = self.u.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
+                layer_at = self.memb.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {z_mean})")
             #print("Info:", all_head.n_atoms, z_mean, layer.n_atoms)
 
-            only_p = layer.select_atoms(f"name {self.working_lip[lipid]['head']}")
+            only_p = layer_at.select_atoms(f"name {self.working_lip[lipid]['head']}")
             positions = only_p.positions[:,:2]
-            angles_sn1 = self.individual_order_sn1(layer, lipid, n_chain1)
+            angles_sn1 = self.individual_order_sn1(layer_at, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
 
             #print(angles_sn1.T.shape, positions.shape)
             #print(angles_sn1.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
-                angles_sn2 = self.individual_order_sn2(layer, lipid, n_chain2)
+                angles_sn2 = self.individual_order_sn2(layer_at, lipid, n_chain2)
                 angles_sn2 = angles_sn2.T
                 to_write = np.concatenate([to_write, angles_sn2], axis = 1)
 
@@ -447,6 +502,16 @@ class twod_analysis:
         string = string + ") "
         return string
 
+    def build_resname_head(self,resnames_list):
+        resnames_list = list(resnames_list)
+        string = f"( (resname {resnames_list[0]}  and name {self.working_lip[resnames_list[0]]['head']}) "
+
+        for resname in resnames_list[1:]:
+            string += f" or (resname {resnames_list[0]}  and name {self.working_lip[resnames_list[0]]['head']}) "
+
+        string +=  " ) "
+        return string
+
     @staticmethod
     def build_name(resnames_list):
         string = " (name " + resnames_list[0]
@@ -458,14 +523,287 @@ class twod_analysis:
         return string
 
 
+    def all_lip_order(self, layer, nbins,
+                        v_min = None,
+                        v_max = None,
+                        all_head = None,
+                        start = None,
+                        final = None,
+                        step = 1):
+
+        lipid_list = list(self.lipid_list)
+        lipid_list.remove("CHL1")
+        lipids = membrane.chain_info
+
+        matrices = []
+        for key in lipid_list:
+            print(key)
+            H, edges = self.order_histogram(key, layer, nbins, lipids[key],v_min = v_min,
+                        v_max = v_max,
+                        all_head = all_head,
+                        start = start,
+                        final = final,
+                        step = step)
+
+            matrices.append(H)
+        matrices = np.array(matrices)
+        print(matrices.shape)
+        matrices = np.nanmean(matrices, axis = 0)
+        plt.close()
+        plt.imshow(matrices[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
+        plt.colorbar(cmap = "Spectral")
+        plt.savefig(f"all_lip_{layer}.png")
+        plt.close()
+        return matrices, edges
+
+    def surface(self,
+                start = None,
+                final = None,
+                step = None,
+                lipid = "DSPC",
+                layer = 'top',
+                filename = None, include_charge = False):
+
+
+
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+        if step == None:
+            step = self.step
+        if filename == None:
+            filename = f"{lipid}_{layer}_{start}_{final}.dat"
+        lipid_list = self.lipid_list
+        print("######### Running surface function ########## ")
+        print(f"We will compute the surface files for a membrane with there lipids {lipid_list}")
+        print(f"Currently working on: {lipid}")
+        print(f"Layer: {layer}")
+        print(f"Writing under the name of {filename}")
+
+
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
+            sign = " < "
+
+
+        ##### Select all the P atoms to find the middle of the membrane
+        all_p = self.all_head
+
+
+
+        #### Loop over trajectory to find the lipids in the requested membrane
+        pos_data = []
+        for ts in self.u.trajectory[start:final:step]:
+            positions = all_p.positions[:,2]
+            mean_z = positions.mean()
+
+            # Selects the lipid head and of the working lipid
+            if layer == "both":build_
+            ### Get resids
+            atom_resid = atoms.resids
+            atom_resid = atom_resid[:,np.newaxis]
+
+            atom_pos = np.concatenate((atom_pos, atom_resid), axis = 1)
+            atom_pos[:,2] = np.abs(atom_pos[:,2]-mean_z)
+
+            pos_data.append(atom_pos)
+
+
+
+        pos_data = np.concatenate(pos_data, axis = 0)
+        df_data = pd.DataFrame(pos_data, columns = ["x", "y", "z", "id"])
+        df_data["id"] = df_data["id"].astype(int)
+        #if include_charge:
+        #    df_data["charge"] = self.charge_li[lipid]
+        #    df_data.to_csv(f"pd_{filename}", index = False)
+        df_data.to_csv(f"pd_{filename}", index = False)
+
+        return df_data   # Maybe have to change, it does not make sense to return this
+
+
+
+        print(f"Computing matrix for {layer} in frames {start}-{final}")
+        data = []
+        for lipid in lipids:
+            filename = f"{lipid}_{layer}_{start}-{final}.dat"
+            print(filename)
+            try:
+                df_data = pd.read_csv(f"pd_{filename}")
+            except:
+                self.surface(lipid = lipid, layer = layer, filename = filename, include_charge = True, start = start, final = final)
+                df_data = pd.read_csv(f"pd_{filename}")
+            data.append(df_data)
+
+        data = pd.concat(data, axis = 0)
+
+
+        #print(data)
+        xmin = self.v_min
+        xmax = self.v_max
+        ymin = self.v_min
+        ymax = self.v_max
+
+        H_height, x_edges, y_edges = np.histogram2d(x = data["x"], y = data["y"], weights = data["z"], bins = nbins, range = [[xmin,xmax], [ymin,ymax]])
+        H_count, x_edges, y_edges = np.histogram2d(x = data["x"], y = data["y"], bins = nbins, range = [[xmin, xmax], [ymin,ymax]])
+
+        H_count[H_count == 0] = 1.
+
+        H_avg = H_height/H_count
+
+        H_avg[H_avg == 0] =  np.nan
+
+        H_avg = np.rot90(H_avg)
+
+        np.savetxt(f'Height_{layer}_{start}_{final}.dat', H_avg, fmt = '%.2f')
+        np.savetxt(f"edges_{layer}_{start}_{final}.dat", x_edges, fmt = "%.2f")
+        return H_avg, x_edges
+
+    def thickness(self, nbins, start = 0, final=-1, step = 1):
+        """_summary_
+
+        Args:
+            nbins (int): number of bins for thickness
+            start (int, optional): Start frame. Defaults to 0.
+            final (int, optional): Final frame. Defaults to -1.
+            step (int, optional): Step frame. Defaults to 1.
+
+        Returns:
+            np.array, np.array: Matrix with the thickness, edeges for the matrix
+        """
+        lipids = list(self.lipid_list)
+        lipids.remove("CHL1")
+        matrix_up, edges = self.height_matrix(lipids,
+                        "top",
+                        start = start,
+                        final = final,
+                        step = step,
+                        nbins = 50)
+        matrix_bot, edges = self.height_matrix(lipids,
+                        "bot",
+                        start = start,
+                        final = final,
+                        step = step,
+                        nbins = 50)
+        mat_thickness = np.nansum(np.array([matrix_up, matrix_bot]),axis = 0)
+        print(mat_thickness,mat_thickness.shape,matrix_bot.shape,[edges[0], edges[-1], edges[0], edges[-1]])
+        plt.close()
+        plt.imshow(mat_thickness[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0], edges[-1], edges[0], edges[-1]])
+        plt.colorbar(cmap = "Spectral")
+        plt.savefig(f"all_lip_thick_.png")
+        plt.close()
+        return mat_thickness, edges
+
+
+    def packing_defects(self,
+                        start = None,
+                        final = None,
+                        step = None,
+                        layer = 'top',
+                        ):
+
+
+
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+        if step == None:
+            step = self.step
+
+
+
+        lipid_list = list(self.lipid_list)
+
+
+        print("######### Running packing defects function ########## ")
+        print(f"We will compute packing defects for a membrane with lipids {lipid_list}")
+
+
+
+
+
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
+            sign = " < "
+
+
+        ##### Select all the P atoms to find the middle of the membrane
+        all_p = self.all_head
+
+
+
+        #### Loop over trajectory to find the lipids in the requested membrane
+        pos_data = []
+        for ts in self.u.trajectory[start:final:step]:
+            positions = all_p.positions[:,2]
+            mean_z = positions.mean()
+            selection_string = f"byres ({self.build_resname_head(lipid_list)} and prop z {sign} {mean_z})"
+            layer_at = self.memb.select_atoms(selection_string)
+            print(set(list(layer_at.atoms.elements)))
+
+
+
+
+
+
 
 
 top = "membrane.gro"
 traj = "membrane.xtc"
-membrane = twod_analysis(top, traj)
-u = membrane.memb
+tpr = "veamos.tpr"
+membrane = twod_analysis(top, traj, tpr=tpr, v_min = 0, v_max = 180, verbose = True, add_radii = True)
 
-print(membrane.lipid_list)
+lipid_list = list(membrane.lipid_list)
+lipid_list.remove("CHL1")
+
+layers = ["top", "bot"]
+nbins = 50
+lipids = membrane.chain_info
+
+#for layer in layers:
+#    for key in lipid_list:
+#        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
+#        print(key, layer, nbins, lipids[key], 0, 180)
+#        plt.imshow(H,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
+#        plt.colorbar(cmap = "Spectral")
+#        plt.savefig(f"{key}_test_{layer}.png")
+#        plt.close()
+#plt.show()
+layer = "top"
+#mat_top, edges = membrane.all_lip_order("top", nbins,
+#                        start = 0,
+#                        final = 100,
+#                        step = 1)#
+
+
+#mat_bot, edges = membrane.all_lip_order("bot", nbins,
+#                        start = 0,
+#                        final = 100,
+#                        step = 1)
+
+membrane.packing_defects(start = 0, final = 10, step =1, layer = "top")
+
+#plt.close()
+#plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
+#plt.savefig("corr.png")
+#plt.close()
+
+#mat_both, edges = membrane.all_lip_order("both", nbins,
+#                        start = 0,
+#                        final = 100,
+#                        step = 1)
+
+
+
+#mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
+#plt.close()
+#plt.scatter(mat_both.flatten(), mat_thi.flatten(), alpha = 0.5)
+#plt.savefig("corr_thilip.png")
+#plt.close()
+#print(membrane.lipid_list)
 
 
 
