@@ -41,16 +41,17 @@ class twod_analysis:
         else:
             self.memb = self.u.select_atoms(f"{self.build_resname(list(lipid_list))}")
 
-
+        self.radii_dict = 0
         if add_radii:
-            radii_dict = {"H": 0.7,
+
+            self.radii_dict = {"H": 0.7,
                             "N": 1.85,
                             "C": 2.06,
                             "P": 2.15,
                             "O": 1.65,
                             }
             string_array = self.memb.elements
-            radii_array = np.array([radii_dict[element] for element in string_array])
+            radii_array = np.array([self.radii_dict[element] for element in string_array])
             self.u.add_TopologyAttr("radii")
             self.memb.radii = radii_array
 
@@ -411,7 +412,6 @@ class twod_analysis:
             on_edge = (sample1[:,i] == edges[i][-1])
             Ncount[i][on_edge] -= 1
 
-
         xy = np.ravel_multi_index(Ncount, nbin)
         xy_test = xy.reshape(-1,1)
 
@@ -424,6 +424,35 @@ class twod_analysis:
         hist = hist[core]
 
         return hist, edges
+
+    # Computes  and return the indexes of the data if where arranegd in a 2d histogram
+    def get_indexes(self,
+                    data,
+                    bins = 10,
+                    v_min = None,
+                    v_max = None):
+
+        if v_min == None:
+            v_min = self.v_min
+        if v_max == None:
+            v_max = self.v_max
+
+
+        nbin = np.empty(2,np.intp)
+        edges = 2*[None]
+
+        for i in range(2):
+            edges[i] = np.linspace(v_min, v_max, bins +1)
+            nbin[i] = len(edges[i]) + 1
+
+        indexes = (tuple(np.searchsorted(edges[i], data[:,i], side = "right") for i in range(2)))
+
+        #for i in range(2):
+        #    on_edge = (data[:,i] == edges[i][-1])
+        #    Ncount[i][on_edge] -= 1
+        #print(np.min(Ncount[0]), np.max(Ncount[0]), np.min(Ncount[1]), np.max(Ncount[1]))
+        #print(len(edges[0]), "edges len")
+        return indexes
 
 
 
@@ -566,9 +595,20 @@ class twod_analysis:
                 lipid = "DSPC",
                 layer = 'top',
                 filename = None, include_charge = False):
+        """_summary_
 
+        Args:
+            start (_type_, optional): _description_. Defaults to None.
+            final (_type_, optional): _description_. Defaults to None.
+            step (_type_, optional): _description_. Defaults to None.
+            lipid (str, optional): _description_. Defaults to "DSPC".
+            layer (str, optional): _description_. Defaults to 'top'.
+            filename (_type_, optional): _description_. Defaults to None.
+            include_charge (bool, optional): _description_. Defaults to False.
 
-
+        Returns:
+            _type_: _description_
+        """
         if start == None:
             start = self.start
         if final == None:
@@ -699,11 +739,92 @@ class twod_analysis:
         return mat_thickness, edges
 
 
+
+    @staticmethod
+    def create_circle_array(grid_size, radius_A, center=None):
+        """_summary_
+
+        Args:
+            grid_size (float): define the grid size to create the optimun grid (Amstrongs)
+            radius_A (float): define the radius for the matrix (amstrongs)
+            center (bool, optional): Bool to set the center of the circle. Defaults to None.
+
+        Returns:
+            np.array : array with a circle of ones
+        """
+
+        n = int(2*radius_A /grid_size) + 1
+        if n % 2 == 0:
+            n += 1
+
+        # Create an n x n array initialized to 1
+        array = np.zeros((n, n))
+
+        # Default the center to the middle of the array if not provided
+        if center is None:
+            center = (n // 2, n // 2)
+
+        # Generate a grid of indices
+        y, x = np.ogrid[:n, :n]
+
+        #   Calculate the distance from each grid point to the center
+        distance_from_center = (x - center[1])**2 + (y - center[0])**2
+
+
+        # Set values to 2 within the circle of the given radius
+        array[distance_from_center <= (radius_A/grid_size)**2] = 1
+
+        return array
+
+    @staticmethod
+    def add_small_matrix(big_matrix, small_matrix, center_i, center_j):
+
+    # Calculate the top-left corner of the submatrix in big_matrix
+        start_i = center_i - small_matrix.shape[0] // 2
+        start_j = center_j - small_matrix.shape[1] // 2
+        end_i = start_i + small_matrix.shape[0]
+        end_j = start_j + small_matrix.shape[1]
+
+    # Handle boundaries to ensure indices stay within big_matrix
+        big_start_i = max(0, start_i)
+        big_start_j = max(0, start_j)
+        big_end_i = min(big_matrix.shape[0], end_i)
+        big_end_j = min(big_matrix.shape[1], end_j)
+
+    # Calculate the overlapping region for small_matrix
+        small_start_i = big_start_i - start_i
+        small_start_j = big_start_j - start_j
+        small_end_i = small_start_i + (big_end_i - big_start_i)
+        small_end_j = small_start_j + (big_end_j - big_start_j)
+
+    # Add the overlapping region of small_matrix to the big_matrix
+        big_matrix[big_start_i:big_end_i, big_start_j:big_end_j] += small_matrix[small_start_i:small_end_i, small_start_j:small_end_j]
+
+        return big_matrix
+
+    def add_deffects(self,
+                    matrix,
+                    indexes,
+                    names,
+                    lipid,
+                    mat_radii_dict):
+        matrix = matrix
+        for i in range(len(indexes[0])):
+            small_matrix = mat_radii_dict[names[i]]
+
+            if names[i] in self.non_polar_dict[lipid]:
+                small_matrix = small_matrix * 0.1
+            #print(small_matrix, indexes[0][i], indexes[1][i])
+            self.add_small_matrix(matrix, small_matrix, indexes[0][i], indexes[1][i])
+        return matrix
+
+
     def packing_defects(self,
                         start = None,
                         final = None,
                         step = None,
                         layer = 'top',
+                        nbins = 180
                         ):
 
 
@@ -714,6 +835,10 @@ class twod_analysis:
             final = self.final
         if step == None:
             step = self.step
+
+        vmin = self.v_min
+        vmax = self.v_max
+        grid_size = abs(vmin - vmax)/nbins
 
 
 
@@ -741,12 +866,38 @@ class twod_analysis:
 
         #### Loop over trajectory to find the lipids in the requested membrane
         pos_data = []
+
+        mat_radii_dict = {}
+        for atom in self.radii_dict.keys():
+            mat_radii_dict[atom] = self.create_circle_array(grid_size, self.radii_dict[atom])
+
+
         for ts in self.u.trajectory[start:final:step]:
+            matrix = np.zeros((nbins+2, nbins+2))
             positions = all_p.positions[:,2]
             mean_z = positions.mean()
-            selection_string = f"byres ({self.build_resname_head(lipid_list)} and prop z {sign} {mean_z})"
-            layer_at = self.memb.select_atoms(selection_string)
-            print(set(list(layer_at.atoms.elements)))
+            for lipid in self.lipid_list:
+                selection_string = f"byres (resname {lipid} and prop z {sign} {mean_z})"
+                layer_at = self.memb.select_atoms(selection_string)
+
+                pos_ats = layer_at.positions[:,:2]
+                indexes = self.get_indexes(pos_ats, nbins)
+                names = layer_at.elements
+                matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
+                plt.imshow(matrix)
+            plt.show()
+
+            print(matrix)
+
+
+
+            #print(counts)
+
+            #print(pos_ats)
+
+
+            #print(f"Stored radii {self.radii_dict}")
+            #print(set(list(layer_at.atoms.elements)))
 
 
 
@@ -758,7 +909,13 @@ class twod_analysis:
 top = "membrane.gro"
 traj = "membrane.xtc"
 tpr = "veamos.tpr"
-membrane = twod_analysis(top, traj, tpr=tpr, v_min = 0, v_max = 180, verbose = True, add_radii = True)
+membrane = twod_analysis(top,
+                         traj,
+                        tpr=tpr,
+                        v_min = 0,
+                        v_max = 180,
+                        verbose = True,
+                        add_radii = True)
 
 lipid_list = list(membrane.lipid_list)
 lipid_list.remove("CHL1")
