@@ -5,4 +5,4 @@
 *.npz
 *.lock
 *.tpr
-
+*.pdb
