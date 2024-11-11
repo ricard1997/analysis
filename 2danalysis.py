@@ -98,6 +98,7 @@ class twod_analysis:
         if guess_chain_l: # Guess the chain lenght of lipids. Chain sn2 start with C2 and chain sn1 start with C3
             self.chain_info = {}
             self.non_polar_dict = {}
+            self.first_lipids = {}
             for lipid in self.lipid_list:
                 first_lipid = self.memb.select_atoms(f"resname {lipid}").resids[0]
                 actual_sn1 = self.memb.select_atoms(f"resid {first_lipid} and name C2*")
@@ -105,7 +106,7 @@ class twod_analysis:
                 actual_sn1 = actual_sn1.names
                 actual_sn2 = actual_sn2.names
                 self.chain_info[lipid] = [len(actual_sn1) - 2, len(actual_sn2) - 2]
-
+                self.first_lipids[lipid] = first_lipid
                 if lipid == "CHL1":
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and not (name O3 or name H3')")
                 else:
@@ -118,6 +119,42 @@ class twod_analysis:
         self.start = 0
         self.final = 100
         self.step = 1
+
+    def visualize_polarity(self, lipids = "all"):
+        """_summary_
+
+        Args:
+            lipids (str or list of str, optional): Lipids to show polarity. Defaults to "all".
+        """
+
+        if lipids == "all":
+            lipids = self.lipid_list
+        else:
+            if isinstance(lipids, list):
+                lipids = [lipids]
+
+
+        if not self.non_polar_dict:
+            print("Non polar atoms are not yet established, please set self.non_polar_dict first")
+            return
+        else:
+            nplots = len(lipids)
+            fig , ax = plt.subplots(1,nplots)
+            count = 0
+            for lipid in lipids:
+                first_lipid = self.memb.select_atoms(f"resid {self.first_lipids[lipid]} and resname {lipid}")
+                lipid_pos = first_lipid.positions[:,:2]
+                lipid_ats = first_lipid.names
+                ax[count].scatter(*lipid_pos.T, s = 200)
+                for i in range(len(lipid_ats)):
+                    ax[count].text(lipid_pos[i,0], lipid_pos[i,1], lipid_ats[i])
+                ax[count].set_title(lipid)
+                count += 1
+            plt.show()
+
+
+
+
 
 
     @staticmethod
@@ -169,7 +206,7 @@ class twod_analysis:
     def individual_order_sn1(self, sel, lipid, n_chain):
         r"""
 
-        Code to loop over the number of carbons in the lipid tail and get a list with the carbon and its
+        Code to loop over the number of carbons_summary_ in the lipid tail and get a list with the carbon and its
         hydrogens for each carbon in the lipid tail: :math:`[C3i, HiX, HiY, ...]`. This list is passed to get_vectors which
         return the averages of each i-th carbon. This code returns an array of dim n_chain with the mean :math:`\braket{cos(\theta_i)^2}`
 
@@ -740,6 +777,12 @@ class twod_analysis:
 
 
 
+    def guess_minmax_space(self):
+        positions = self.memb.positions[:,2]
+        vmin = np.min(positions)
+        vmax = np.max(positions)
+        return vmin,vmax
+
     @staticmethod
     def create_circle_array(grid_size, radius_A, center=None):
         """_summary_
@@ -906,16 +949,18 @@ class twod_analysis:
 
 
 
-top = "membrane.gro"
-traj = "membrane.xtc"
+top = "dopcchol_Charmm.pdb"
+traj = "dopcchol_Charmm.pdb"
 tpr = "veamos.tpr"
 membrane = twod_analysis(top,
                          traj,
-                        tpr=tpr,
-                        v_min = 0,
-                        v_max = 180,
+                        #tpr=tpr,
+                        v_min = -10,
+                        v_max = 95,
                         verbose = True,
                         add_radii = True)
+
+print(membrane.guess_minmax_space())
 
 lipid_list = list(membrane.lipid_list)
 lipid_list.remove("CHL1")
@@ -923,7 +968,7 @@ lipid_list.remove("CHL1")
 layers = ["top", "bot"]
 nbins = 50
 lipids = membrane.chain_info
-
+membrane.visualize_polarity()
 #for layer in layers:
 #    for key in lipid_list:
 #        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
@@ -945,7 +990,7 @@ layer = "top"
 #                        final = 100,
 #                        step = 1)
 
-membrane.packing_defects(start = 0, final = 10, step =1, layer = "top")
+membrane.packing_defects(start = 0, final = 10, step =1,nbins = 80, layer = "top")
 
 #plt.close()
 #plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
