@@ -16,20 +16,43 @@ traj = "dopcchol_Charmm.pdb"
 tpr = "veamos.tpr"
 
 
-#top = "membrane.gro"
-#traj = "membrane.xtc"
+top = "membrane.gro"
+traj = "membrane.xtc"
 membrane = twod_analysis(top,
                          traj,
-                        #tpr=tpr,
+                        tpr=tpr,
                         v_min = -10,
-                        v_max = 95,
+                        v_max = 180,
                         verbose = True,
                         add_radii = True)
 
 #print(membrane.guess_minmax_space())
 
 lipid_list = list(membrane.lipid_list)
-lipid_list.remove("CHL1")
+first_lipids = membrane.first_lipids
+"""
+lipid_polar = {}
+for key in first_lipids.keys():
+    polar_dict = {"polar":[], "nonpolar": []}
+    #print(membrane.non_polar_dict[key])
+    atoms = membrane.u.select_atoms(f"resid {first_lipids[key]}")
+    names = atoms.names
+    for name in names:
+        #print(membrane.non_polar_dict[key])
+        if name in membrane.non_polar_dict[key]:
+            polar_dict["nonpolar"].append(name)
+        else:
+            polar_dict["polar"].append(name)
+
+    lipid_polar[key] = polar_dict
+
+
+for key in lipid_polar.keys():
+    print(key)
+    print(f"###### {membrane.build_name(  lipid_polar[key]['polar'])}    ######\n\n")
+    print(f"###### {membrane.build_name(lipid_polar[key]['nonpolar'])}    ######\n\n")
+"""
+
 
 layers = ["top", "bot"]
 nbins = 50
@@ -59,7 +82,26 @@ layer = "top"
 #                        final = 100,
 #                        step = 1)
 
-membrane.packing_defects(start = 0, final = 10, step =1,nbins = 80, layer = "top", height = True)
+
+membrane.visualize_polarity()
+membrane.non_polar_dict["POPE"].append("H101")
+membrane.non_polar_dict["POPE"].append("H91")
+
+print(membrane.non_polar_dict["POPE"])
+membrane.visualize_polarity()
+
+matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
+
+fig,ax = plt.subplots(1,2)
+ax[0].imshow(np.rot90(matrix))
+
+ax[1].imshow(np.rot90(matrix_height))
+
+
+
+
+
+plt.show()
 
 #plt.close()
 #plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
