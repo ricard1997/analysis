@@ -50,6 +50,13 @@ class twod_analysis:
                             "P": 2.15,
                             "O": 1.65,
                             }
+            #val = 0.5
+            #self.radii_dict = {"H": val,
+            #                "N": val,
+            #                "C": val,
+            #                "P": val,
+            #                "O": val,
+            #                }
             string_array = self.memb.elements
             radii_array = np.array([self.radii_dict[element] for element in string_array])
             self.u.add_TopologyAttr("radii")
@@ -164,7 +171,7 @@ class twod_analysis:
                 lipid_pos = first_lipid.positions
                 lipid_ats = first_lipid.names
                 polarity = ["blue" if name in self.non_polar_dict[lipid] else "red" for name in lipid_ats]
-                print(polarity, lipid_ats)
+                #print(polarity, lipid_ats)
                 ax = fig.add_subplot(1,nplots, count+1, projection = "3d")
                 ax.scatter(*lipid_pos.T, s = 10, c = polarity)
                 dists = []
@@ -373,9 +380,6 @@ class twod_analysis:
                 atoms = sel.select_atoms(selection)
 
 
-                if atoms.n_atoms != 0:
-                    lista.append(atoms)
-            # Call get_individual that computes the cos^2(theta) for each carbon.
             angles = self.get_individual(lista)
             if len(angles) > max_v:
                 max_v = len(angles)
@@ -943,15 +947,18 @@ class twod_analysis:
     def add_deffects(self,
                     matrix,
                     indexes,
+                    elements,
                     names,
                     lipid,
                     mat_radii_dict):
         matrix = matrix
+        #print("names", names, "mat_radii_dict", mat_radii_dict)
         for i in range(len(indexes[0])):
-            small_matrix = mat_radii_dict[names[i]]
+
+            small_matrix = mat_radii_dict[elements[i]]
 
             if names[i] in self.non_polar_dict[lipid]:
-                small_matrix = small_matrix * 0.1
+                small_matrix = small_matrix * 0.0001
             #print(small_matrix, indexes[0][i], indexes[1][i])
             self.add_small_matrix(matrix, small_matrix, indexes[0][i], indexes[1][i])
         return matrix
@@ -1031,9 +1038,18 @@ class twod_analysis:
             matrix_height = np.zeros((nbins+2, nbins+2))
         positions = all_p.positions[:,2]
         mean_z = positions.mean()
+        #self.lipid_list.remove("DODMA")
+        #self.lipid_list.remove("POPE")
+        #self.lipid_list.remove("CHL1")
         for lipid in self.lipid_list:
-            selection_string = f"byres (resname {lipid} and prop z {sign} {mean_z})"
+            selection_string = f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z})"
+            #all_lip = self.memb.select_atoms(f"resname {lipid}")
             layer_at = self.memb.select_atoms(selection_string)
+
+            if lipid == "POPE":
+                print(f"Boool test H91, {'H91' in self.non_polar_dict[lipid]}")
+                print(f"Boool test H101, {'H101' in self.non_polar_dict[lipid]}")
+            #print("names",len(layer_at.residues.resids), len(all_lip.residues.resids), mean_z, np.mean(layer_at.positions[:,2]))
             pos_ats = layer_at.positions
             if not height:
                 indexes = self.get_indexes(pos_ats[:,:2], nbins)
@@ -1043,89 +1059,26 @@ class twod_analysis:
                 #print(matrix_height[20, :], matrix_temp[20,:])
                 matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
                 #print(matrix_height[20, :])
-            names = layer_at.elements
-            matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
+            elements = layer_at.elements
+            names = layer_at.names
+            #print(layer_at.residues.resids)
+            #layer_at.write("layer.gro")
+            #plt.scatter(*pos_ats[:,:2].T)
+            #plt.show()
+            matrix = self.add_deffects(matrix, indexes,elements, names, lipid, mat_radii_dict)
 
 
+        deffects = np.where(matrix < 1, matrix, np.nan)
+        print(deffects, deffects.shape, deffects[0],matrix.shape)
+        #deffects = matrix
+        #deffects[deffects == 0 ] = np.nan
         if height:
-            return matrix, matrix_height
-        return matrix
+            matrix_height[matrix_height == 0 ] = np.nan
+            return deffects, matrix_height
+        return deffects
 
 
 
-
-
-
-
-
-top = "dopcchol_Charmm.pdb"
-traj = "dopcchol_Charmm.pdb"
-tpr = "veamos.tpr"
-
-
-#top = "membrane.gro"
-#traj = "membrane.xtc"
-membrane = twod_analysis(top,
-                         traj,
-                        #tpr=tpr,
-                        v_min = -10,
-                        v_max = 95,
-                        verbose = True,
-                        add_radii = True)
-
-#print(membrane.guess_minmax_space())
-
-lipid_list = list(membrane.lipid_list)
-lipid_list.remove("CHL1")
-
-layers = ["top", "bot"]
-nbins = 50
-lipids = membrane.chain_info
-#membrane.visualize_polarity()
-plt.show()
-
-
-#for layer in layers:
-#    for key in lipid_list:
-#        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
-#        print(key, layer, nbins, lipids[key], 0, 180)
-#        plt.imshow(H,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
-#        plt.colorbar(cmap = "Spectral")
-#        plt.savefig(f"{key}_test_{layer}.png")
-#        plt.close()
-#plt.show()
-layer = "top"
-#mat_top, edges = membrane.all_lip_order("top", nbins,
-#                        start = 0,
-#                        final = 100,
-#                        step = 1)#
-
-
-#mat_bot, edges = membrane.all_lip_order("bot", nbins,
-#                        start = 0,
-#                        final = 100,
-#                        step = 1)
-
-membrane.packing_defects(start = 0, final = 10, step =1,nbins = 80, layer = "top", height = True)
-
-#plt.close()
-#plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
-#plt.savefig("corr.png")
-#plt.close()
-
-#mat_both, edges = membrane.all_lip_order("both", nbins,
-#                        start = 0,
-#                        final = 100,
-#                        step = 1)
-
-
-
-#mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
-#plt.close()
-#plt.scatter(mat_both.flatten(), mat_thi.flatten(), alpha = 0.5)
-#plt.savefig("corr_thilip.png")
-#plt.close()
-#print(membrane.lipid_list)
 
 
 
