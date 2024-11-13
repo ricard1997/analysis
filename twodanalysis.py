@@ -447,6 +447,21 @@ class twod_analysis:
 
         return result
 
+    @staticmethod
+    def get_highest(data, min_lenght):
+        columns = ["index", "weight"] # Data expected is an np array with columns ["index", "x", "y", "z"]
+
+        df = pd.DataFrame(data, columns = columns)
+        result = df.groupby('index', as_index=False)['weight'].max()
+        result_dict = dict(zip(result['index'], result['weight']))
+        hist = []
+        for i in range(min_lenght):
+            try:
+                hist.append(result_dict[i])
+            except:
+                hist.append(np.nan)
+        return np.array(hist)
+
     # Computes the average vector for each bin, sample are the raw x,y positions and weights are the vectors related to the head
     def pseudohistogram2D(self,sample1, weights, bins = 10, v_min = None, v_max = None):
         if v_min == None:
@@ -521,7 +536,8 @@ class twod_analysis:
                     data,
                     bins = 10,
                     v_min = None,
-                    v_max = None):
+                    v_max = None,
+                    matrix_height = False):
 
         if v_min == None:
             v_min = self.v_min
@@ -536,13 +552,38 @@ class twod_analysis:
             edges[i] = np.linspace(v_min, v_max, bins +1)
             nbin[i] = len(edges[i]) + 1
 
-        indexes = (tuple(np.searchsorted(edges[i], data[:,i], side = "right") for i in range(2)))
+
+        if not matrix_height:
+
+            indexes = (tuple(np.searchsorted(edges[i], data[:,i], side = "right") for i in range(2)))
+        else:
+            indexes = (tuple(np.searchsorted(edges[i], data[:,i], side = "right") for i in range(2)))
+
+            xy = np.ravel_multi_index(indexes, nbin)
+            xy_test = xy.reshape(-1,1)
+
+            print("last shape", data[:,2].reshape(-1,1).shape, xy_test.shape)
+            xy_test = np.concatenate((xy_test, data[:,2].reshape(-1,1)), axis = 1)
+            hist = self.get_highest(xy_test, nbin.prod())
+
+
+            hist = hist.reshape(nbin)
+            hist = hist.astype(float, casting = "safe")
+            hist[np.isnan(hist)] = 0
+            #core = 2*(slice(1,-1),)
+            #hist = hist[core]
+            print("here", hist[20,:])
+            return indexes, hist
 
         #for i in range(2):
         #    on_edge = (data[:,i] == edges[i][-1])
         #    Ncount[i][on_edge] -= 1
         #print(np.min(Ncount[0]), np.max(Ncount[0]), np.min(Ncount[1]), np.max(Ncount[1]))
         #print(len(edges[0]), "edges len")
+
+
+
+
         return indexes
 
 
@@ -921,7 +962,8 @@ class twod_analysis:
                         final = None,
                         step = None,
                         layer = 'top',
-                        nbins = 180
+                        nbins = 180,
+                        height = False,
                         ):
 
 
@@ -971,17 +1013,36 @@ class twod_analysis:
 
         for ts in self.u.trajectory[start:final:step]:
             matrix = np.zeros((nbins+2, nbins+2))
+            if height:
+                matrix_height = np.zeros((nbins+2, nbins+2))
             positions = all_p.positions[:,2]
             mean_z = positions.mean()
             for lipid in self.lipid_list:
                 selection_string = f"byres (resname {lipid} and prop z {sign} {mean_z})"
                 layer_at = self.memb.select_atoms(selection_string)
+                plt.imshow(matrix_height)
+                plt.colorbar()
+                plt.show()
 
-                pos_ats = layer_at.positions[:,:2]
-                indexes = self.get_indexes(pos_ats, nbins)
+                pos_ats = layer_at.positions
+                print(pos_ats.shape)
+                if not height:
+                    indexes = self.get_indexes(pos_ats[:,:2], nbins)
+                else:
+                    indexes, matrix_temp = self.get_indexes(pos_ats, nbins, matrix_height = True)
+                    print("test dimensions:", matrix.shape, matrix_height.shape)
+                    print(matrix_height[20, :], matrix_temp[20,:])
+                    matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
+                    print(matrix_height[20, :])
                 names = layer_at.elements
                 matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
-                plt.imshow(matrix)
+
+            plt.imshow(matrix)
+            plt.colorbar()
+            plt.show()
+            matrix_height[matrix_height == 0] = np.nan
+            plt.imshow(matrix_height)
+            plt.colorbar()
             plt.show()
 
             print(matrix)
@@ -1026,7 +1087,7 @@ lipid_list.remove("CHL1")
 layers = ["top", "bot"]
 nbins = 50
 lipids = membrane.chain_info
-membrane.visualize_polarity()
+#membrane.visualize_polarity()
 plt.show()
 
 
@@ -1051,7 +1112,7 @@ layer = "top"
 #                        final = 100,
 #                        step = 1)
 
-membrane.packing_defects(start = 0, final = 10, step =1,nbins = 80, layer = "top")
+membrane.packing_defects(start = 0, final = 10, step =1,nbins = 80, layer = "top", height = True)
 
 #plt.close()
 #plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
