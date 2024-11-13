@@ -1025,7 +1025,7 @@ class twod_analysis:
                 plt.show()
 
                 pos_ats = layer_at.positions
-                print(pos_ats.shape)
+                #print(pos_ats.shape)
                 if not height:
                     indexes = self.get_indexes(pos_ats[:,:2], nbins)
                 else:
@@ -1037,25 +1037,12 @@ class twod_analysis:
                 names = layer_at.elements
                 matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
 
-            plt.imshow(matrix)
-            plt.colorbar()
-            plt.show()
-            matrix_height[matrix_height == 0] = np.nan
-            plt.imshow(matrix_height)
-            plt.colorbar()
-            plt.show()
-
-            print(matrix)
 
 
 
-            #print(counts)
-
-            #print(pos_ats)
-
-
-            #print(f"Stored radii {self.radii_dict}")
-            #print(set(list(layer_at.atoms.elements)))
+        if height:
+            return matrix, matrix_height
+        return matrix
 
 
 
