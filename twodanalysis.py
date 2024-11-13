@@ -67,7 +67,7 @@ class twod_analysis:
             #polar_chains = [polar_motif, polar_PS, polar_PI, polar_PA, polar_PC, polar_PE]
             #polar_atoms = [chain.split() for chain in polar_atoms]
             dspc = self.memb.select_atoms("(resname DSPC and not (name C3* or name H*X or name H*Y or name C2* or name H*R or name H*S)) or (resname DSPC and(name C3 or name HX or name HY or name C2 or name HR or name HS))")
-            print(set(dspc.atoms.names))
+            #print(set(dspc.atoms.names))
 
 
         if verbose:
@@ -108,7 +108,7 @@ class twod_analysis:
                 actual_sn2 = actual_sn2.names
                 self.chain_info[lipid] = [len(actual_sn1) - 2, len(actual_sn2) - 2]
                 self.first_lipids[lipid] = first_lipid
-                print(first_lipid)
+                #print(first_lipid)
                 if lipid == "CHL1":
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and not (name O3 or name H3')")
                     all_lip = self.memb.select_atoms(f"resid {first_lipid}")
@@ -117,9 +117,9 @@ class twod_analysis:
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and (name *C3* or name H*Y or name H*X or name H*Z  or name *C2* or name H*R or name H*S or name H*T) and not (name C3 or name C31 or name HY or name HX or name HZ  or name C2 or name C21 or name HR or name HS or name HT)")
                     all_lip = self.memb.select_atoms(f"resid {first_lipid}")
                 self.non_polar_dict[lipid] = list(non_polar.names)
-                print(f"########### alll atoms {all_lip.n_atoms}  resid {first_lipid}")
+                #print(f"########### alll atoms {all_lip.n_atoms}  resid {first_lipid}")
                 self.non_polar_visualize[lipid] = [all_lip, non_polar]
-            print(self.non_polar_dict)
+            #print(self.non_polar_dict)
 
 
         self.all_head = self.u.select_atoms(self.build_resname(self.lipid_list) + " and name P")
@@ -562,7 +562,7 @@ class twod_analysis:
             xy = np.ravel_multi_index(indexes, nbin)
             xy_test = xy.reshape(-1,1)
 
-            print("last shape", data[:,2].reshape(-1,1).shape, xy_test.shape)
+            #print("last shape", data[:,2].reshape(-1,1).shape, xy_test.shape)
             xy_test = np.concatenate((xy_test, data[:,2].reshape(-1,1)), axis = 1)
             hist = self.get_highest(xy_test, nbin.prod())
 
@@ -572,7 +572,7 @@ class twod_analysis:
             hist[np.isnan(hist)] = 0
             #core = 2*(slice(1,-1),)
             #hist = hist[core]
-            print("here", hist[20,:])
+            #print("here", hist[20,:])
             return indexes, hist
 
         #for i in range(2):
@@ -1026,33 +1026,25 @@ class twod_analysis:
             mat_radii_dict[atom] = self.create_circle_array(grid_size, self.radii_dict[atom])
 
 
-        for ts in self.u.trajectory[start:final:step]:
-            matrix = np.zeros((nbins+2, nbins+2))
-            if height:
-                matrix_height = np.zeros((nbins+2, nbins+2))
-            positions = all_p.positions[:,2]
-            mean_z = positions.mean()
-            for lipid in self.lipid_list:
-                selection_string = f"byres (resname {lipid} and prop z {sign} {mean_z})"
-                layer_at = self.memb.select_atoms(selection_string)
-                plt.imshow(matrix_height)
-                plt.colorbar()
-                plt.show()
-
-                pos_ats = layer_at.positions
-                #print(pos_ats.shape)
-                if not height:
-                    indexes = self.get_indexes(pos_ats[:,:2], nbins)
-                else:
-                    indexes, matrix_temp = self.get_indexes(pos_ats, nbins, matrix_height = True)
-                    print("test dimensions:", matrix.shape, matrix_height.shape)
-                    print(matrix_height[20, :], matrix_temp[20,:])
-                    matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
-                    print(matrix_height[20, :])
-                names = layer_at.elements
-                matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
-
-
+        matrix = np.zeros((nbins+2, nbins+2))
+        if height:
+            matrix_height = np.zeros((nbins+2, nbins+2))
+        positions = all_p.positions[:,2]
+        mean_z = positions.mean()
+        for lipid in self.lipid_list:
+            selection_string = f"byres (resname {lipid} and prop z {sign} {mean_z})"
+            layer_at = self.memb.select_atoms(selection_string)
+            pos_ats = layer_at.positions
+            if not height:
+                indexes = self.get_indexes(pos_ats[:,:2], nbins)
+            else:
+                indexes, matrix_temp = self.get_indexes(pos_ats, nbins, matrix_height = True)
+                #print("test dimensions:", matrix.shape, matrix_height.shape)
+                #print(matrix_height[20, :], matrix_temp[20,:])
+                matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
+                #print(matrix_height[20, :])
+            names = layer_at.elements
+            matrix = self.add_deffects(matrix, indexes, names, lipid, mat_radii_dict)
 
 
         if height:
@@ -1081,7 +1073,7 @@ membrane = twod_analysis(top,
                         verbose = True,
                         add_radii = True)
 
-print(membrane.guess_minmax_space())
+#print(membrane.guess_minmax_space())
 
 lipid_list = list(membrane.lipid_list)
 lipid_list.remove("CHL1")
