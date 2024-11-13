@@ -965,6 +965,21 @@ class twod_analysis:
                         nbins = 180,
                         height = False,
                         ):
+        """_summary_
+
+        Args:
+            start (int, optional): Frame to start. Defaults to None.
+            final (int, optional): Frame to finish. Defaults to None.
+            step (int, optional): Frames to skip. Defaults to None.
+            layer (str, optional): working layer (top/bot). Defaults to 'top'.
+            nbins (int, optional): Number of bins of the xy grid. Defaults to 180.
+            height (bool, optional): Store height matrix (To study deepness of th epacking defects). Defaults to False.
+
+        Returns:
+            ndarray : If height == Flase: matrix with pcking deffects
+            ndarray, ndarray : If height === True: matrix with pcking deffects, amtrix with height information
+        """
+
 
 
 
