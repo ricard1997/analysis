@@ -29,56 +29,55 @@ class twod_analysis:
 
 
 
+        # Read trajectory depending if tpr is provided or not
         if tpr:
             self.u = mda.Universe(tpr, traj)
         else:
             self.u = mda.Universe(top, traj)
-        #print(self.u.resids)
 
+        # Select elements in the membrane (in principle only lipids)
         if not lipid_list: # Select only elements of the membrane
             self.memb = self.u.select_atoms("all and not protein and not (resname URA or resname GUA or resname ADE or resname CYT)")
             self.lipid_list = set(self.memb.residues.resnames)
         else:
             self.memb = self.u.select_atoms(f"{self.build_resname(list(lipid_list))}")
 
+
+        # Set radius sizes of different elements
         self.radii_dict = 0
         if add_radii:
-
             self.radii_dict = {"H": 0.7,
                             "N": 1.85,
                             "C": 2.06,
                             "P": 2.15,
                             "O": 1.65,
                             }
-            #val = 0.5
-            #self.radii_dict = {"H": val,
-            #                "N": val,
-            #                "C": val,
-            #                "P": val,
-            #                "O": val,
-            #                }
+
+
+            # Add radii as a topology attribute for Mdanalysis
             string_array = self.memb.elements
             radii_array = np.array([self.radii_dict[element] for element in string_array])
             self.u.add_TopologyAttr("radii")
             self.memb.radii = radii_array
 
-            polar_motif = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
-            polar_PS = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
-            polar_PI = "C12 H2 O2 HO2 C13 H3 O3 HO3 C14 H4 O4 HO4 C15 H5 O5 HO5 C16 H6 O6 HO6 C11 H1"
-            polar_PA = "H12 "
-            polar_PC = "N C12 C13 C14 C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C C11 H11A H11B"
-            polar_PE = "N HN1 HN2 HN3 C12 H12A H12B C11 H11A H11B"
-            polar_CHL = "O3 H3'"
+            # May use to build a different way to select polar atoms
+            #polar_motif = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
+            #polar_PS = "N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B"
+            #polar_PI = "C12 H2 O2 HO2 C13 H3 O3 HO3 C14 H4 O4 HO4 C15 H5 O5 HO5 C16 H6 O6 HO6 C11 H1"
+            #polar_PA = "H12 "
+            #polar_PC = "N C12 C13 C14 C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C C11 H11A H11B"
+            #polar_PE = "N HN1 HN2 HN3 C12 H12A H12B C11 H11A H11B"
+            #polar_CHL = "O3 H3'"
 
 
             #polar_chains = [polar_motif, polar_PS, polar_PI, polar_PA, polar_PC, polar_PE]
             #polar_atoms = [chain.split() for chain in polar_atoms]
-            dspc = self.memb.select_atoms("(resname DSPC and not (name C3* or name H*X or name H*Y or name C2* or name H*R or name H*S)) or (resname DSPC and(name C3 or name HX or name HY or name C2 or name HR or name HS))")
+            #dspc = self.memb.select_atoms("(resname DSPC and not (name C3* or name H*X or name H*Y or name C2* or name H*R or name H*S)) or (resname DSPC and(name C3 or name HX or name HY or name C2 or name HR or name HS))")
             #print(set(dspc.atoms.names))
 
 
-        if verbose:
-            print(self.u.atoms.elements, "jere")
+
+
 
 
 
@@ -101,7 +100,6 @@ class twod_analysis:
         self.chain_info = chain_info
 
 
-
         if guess_chain_l: # Guess the chain lenght of lipids. Chain sn2 start with C2 and chain sn1 start with C3
             self.chain_info = {}
             self.non_polar_dict = {}
@@ -115,7 +113,7 @@ class twod_analysis:
                 actual_sn2 = actual_sn2.names
                 self.chain_info[lipid] = [len(actual_sn1) - 2, len(actual_sn2) - 2]
                 self.first_lipids[lipid] = first_lipid
-                #print(first_lipid)
+
                 if lipid == "CHL1":
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and not (name O3 or name H3')")
                     all_lip = self.memb.select_atoms(f"resid {first_lipid}")
@@ -124,9 +122,9 @@ class twod_analysis:
                     non_polar = self.memb.select_atoms(f"resid {first_lipid} and (name *C3* or name H*Y or name H*X or name H*Z  or name *C2* or name H*R or name H*S or name H*T) and not (name C3 or name C31 or name HY or name HX or name HZ  or name C2 or name C21 or name HR or name HS or name HT)")
                     all_lip = self.memb.select_atoms(f"resid {first_lipid}")
                 self.non_polar_dict[lipid] = list(non_polar.names)
-                #print(f"########### alll atoms {all_lip.n_atoms}  resid {first_lipid}")
+
                 self.non_polar_visualize[lipid] = [all_lip, non_polar]
-            #print(self.non_polar_dict)
+
 
 
         self.all_head = self.u.select_atoms(self.build_resname(self.lipid_list) + " and name P")
@@ -134,20 +132,39 @@ class twod_analysis:
         self.final = 100
         self.step = 1
 
+        if verbose:
+            print(f"This system contains the following lipids : {self.lipid_list}\n\n")
+            print(f"The chain lenght is : \n{self.print_dict(self.chain_info)}\n")
+            print(f"We will use the following heads and charges for the following lipids. If the lipid is not here we will use P as head as default \n{self.print_dict(self.working_lip)}\n")
+            print("Note: To compute the middle of the membrane we use only P heads\n\n")
+            print(f"The default start frame is {self.start}, final {self.final}, step {self.step}\n\n")
+
+    # Method to print dictionaries
+    @staticmethod
+    def print_dict(dict):
+        string = ""
+        for key in dict.keys():
+            string += f"{key} : {dict[key]}\n"
+        return string
+
+
     def visualize_polarity(self, lipids = "all"):
-        """_summary_
+        """This function is used to visualize what atoms are considered in polarity
 
         Args:
             lipids (str or list of str, optional): Lipids to show polarity. Defaults to "all".
         """
         aspect_ratio = [1, 1, 1]
 
+        # Get lipids to work
         if lipids == "all":
             lipids = self.lipid_list
         else:
             if isinstance(lipids, list):
                 lipids = [lipids]
 
+
+        #Guess bonds if needed
         try:
             self.u.bonds
         except:
@@ -155,7 +172,7 @@ class twod_analysis:
             self.u.add_TopologyAttr("bonds", bonds)
             #print(mda.topology.guessers.guess_bonds(first_lipid, first_lipid.positions))
 
-
+        # Make a 3D plot of the individual lipids and shows it
         if not self.non_polar_dict:
             print("Non polar atoms are not yet established, please set self.non_polar_dict first")
             return
@@ -182,35 +199,23 @@ class twod_analysis:
                     mids.append(np.min(lipid_pos[:,i] + value/2))
                 dists = max(dists)
                 dists = dists + 0.01*dists
-
-
-
-
-
                 for atom in first_lipid:
                     bonds = atom.bonded_atoms
                     for bond in bonds:
                         vector = np.array([atom.position, bond.position])
                         plt.plot(*vector.T, color = "black")
-
-
-
-
-
-
-                #ax[count].scatter(*lipid_pos.T, s = 200)
                 for i in range(len(lipid_ats)):
                     if lipid_ats[i] in self.non_polar_dict[lipid]:
                         ax.text(lipid_pos[i,0], lipid_pos[i,1],  lipid_pos[i,2], lipid_ats[i], color = "black", fontsize = 6)
                     else:
                         ax.text(lipid_pos[i,0], lipid_pos[i,1], lipid_pos[i,2], lipid_ats[i], color = "black", fontsize = 6)
                 ax.set_box_aspect(aspect_ratio)
-
                 ax.set_title(lipid)
                 ax.set_xlim(mids[0]-dists/2, mids[0]+dists/2)
                 ax.set_ylim(mids[1]-dists/2, mids[1]+dists/2)
                 ax.set_zlim(mids[2]-dists/2, mids[2]+dists/2)
                 count += 1
+        plt.show()
 
 
 
@@ -1056,7 +1061,7 @@ class twod_analysis:
             else:
                 indexes, matrix_temp = self.get_indexes(pos_ats, nbins, matrix_height = True)
                 #print("test dimensions:", matrix.shape, matrix_height.shape)
-                #print(matrix_height[20, :], matrix_temp[20,:])
+                 #print(matrix_height[20, :], matrix_temp[20,:])
                 matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
                 #print(matrix_height[20, :])
             elements = layer_at.elements
