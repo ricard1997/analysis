@@ -7,8 +7,9 @@ from scipy.integrate import simps
 import time
 from matplotlib.patches import Patch
 import nglview as nv
-
 from twodanalysis import twod_analysis
+
+
 
 
 top = "dopcchol_Charmm.pdb"
@@ -18,6 +19,8 @@ tpr = "veamos.tpr"
 
 top = "membrane.gro"
 traj = "membrane.xtc"
+
+# Creating the class
 membrane = twod_analysis(top,
                          traj,
                         tpr=tpr,
@@ -26,41 +29,19 @@ membrane = twod_analysis(top,
                         verbose = True,
                         add_radii = True)
 
-#print(membrane.guess_minmax_space())
+
+
+
+
 
 lipid_list = list(membrane.lipid_list)
 first_lipids = membrane.first_lipids
-"""
-lipid_polar = {}
-for key in first_lipids.keys():
-    polar_dict = {"polar":[], "nonpolar": []}
-    #print(membrane.non_polar_dict[key])
-    atoms = membrane.u.select_atoms(f"resid {first_lipids[key]}")
-    names = atoms.names
-    for name in names:
-        #print(membrane.non_polar_dict[key])
-        if name in membrane.non_polar_dict[key]:
-            polar_dict["nonpolar"].append(name)
-        else:
-            polar_dict["polar"].append(name)
 
-    lipid_polar[key] = polar_dict
-
-
-for key in lipid_polar.keys():
-    print(key)
-    print(f"###### {membrane.build_name(  lipid_polar[key]['polar'])}    ######\n\n")
-    print(f"###### {membrane.build_name(lipid_polar[key]['nonpolar'])}    ######\n\n")
-"""
-
+######### Lipid order 2d code related ########
 
 layers = ["top", "bot"]
 nbins = 50
 lipids = membrane.chain_info
-#membrane.visualize_polarity()
-plt.show()
-
-
 #for layer in layers:
 #    for key in lipid_list:
 #        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
@@ -83,36 +64,57 @@ layer = "top"
 #                        step = 1)
 
 
-membrane.visualize_polarity()
+
+
+
+
+
+##### Packing deffects related ######
+
+
+# Adding POPE lipids that are not taken into account
 membrane.non_polar_dict["POPE"].append("H101")
 membrane.non_polar_dict["POPE"].append("H91")
 
-print(membrane.non_polar_dict["POPE"])
+""" Print selections to test packing deffects with VMD
+lipid_polar = {}
+for key in first_lipids.keys():
+    polar_dict = {"polar":[], "nonpolar": []}
+    #print(membrane.non_polar_dict[key])
+    atoms = membrane.u.select_atoms(f"resid {first_lipids[key]}")
+    names = atoms.names
+    for name in names:
+        #print(membrane.non_polar_dict[key])
+        if name in membrane.non_polar_dict[key]:
+            polar_dict["nonpolar"].append(name)
+        else:
+            polar_dict["polar"].append(name)
+
+    lipid_polar[key] = polar_dict
+
+
+for key in lipid_polar.keys():
+    print(key)
+    print(f"###### resname {key} and {membrane.build_name(  lipid_polar[key]['polar'])}    ######\n\n")
+    print(f"###### resname {key} and {membrane.build_name(lipid_polar[key]['nonpolar'])}    ######\n\n")
+
+"""
+
+
 membrane.visualize_polarity()
 
-matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
-
-fig,ax = plt.subplots(1,2)
-ax[0].imshow(np.rot90(matrix))
-
-ax[1].imshow(np.rot90(matrix_height))
-
-
-
+#print(membrane.non_polar_dict["POPE"])
+#membrane.visualize_polarity()
+#matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
+#fig,ax = plt.subplots(1,2)
+#ax[0].imshow(np.rot90(matrix))
+#ax[1].imshow(np.rot90(matrix_height))
+#plt.show()
 
 
-plt.show()
 
-#plt.close()
-#plt.scatter(mat_top.flatten(), mat_bot.flatten(), alpha = 0.5)
-#plt.savefig("corr.png")
-#plt.close()
 
-#mat_both, edges = membrane.all_lip_order("both", nbins,
-#                        start = 0,
-#                        final = 100,
-#                        step = 1)
-
+#### Membrane thickness related code ##########
 
 
 #mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
