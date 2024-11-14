@@ -39,18 +39,21 @@ first_lipids = membrane.first_lipids
 
 ######### Lipid order 2d code related ########
 
-layers = ["top", "bot"]
+layers = ["top", "bot", "both"]
+lipid_list.remove("CHL1")
 nbins = 50
 lipids = membrane.chain_info
-#for layer in layers:
-#    for key in lipid_list:
-#        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
-#        print(key, layer, nbins, lipids[key], 0, 180)
-#        plt.imshow(H,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
-#        plt.colorbar(cmap = "Spectral")
-#        plt.savefig(f"{key}_test_{layer}.png")
-#        plt.close()
-#plt.show()
+"""
+for layer in layers:
+    for key in lipid_list:
+        H, edges = membrane.order_histogram(key, layer, nbins, lipids[key])
+        print(key, layer, nbins, lipids[key], 0, 180)
+        plt.imshow(H,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
+        plt.colorbar(cmap = "Spectral")
+        plt.savefig(f"{key}_test1_{layer}.png")
+        plt.close()
+plt.show()
+"""
 layer = "top"
 #mat_top, edges = membrane.all_lip_order("top", nbins,
 #                        start = 0,
@@ -63,8 +66,15 @@ layer = "top"
 #                        final = 100,
 #                        step = 1)
 
+mat_both, edges = membrane.all_lip_order("both", nbins,
+                        start = 0,
+                        final = 100,
+                        step = 1)
 
-
+#plt.imshow(mat_top, cmap = "Spectral")
+#plt.show()
+#plt.imshow(mat_top, cmap = "Spectral")
+#plt.show()
 
 
 
@@ -101,7 +111,7 @@ for key in lipid_polar.keys():
 """
 
 
-membrane.visualize_polarity()
+#membrane.visualize_polarity()
 
 #print(membrane.non_polar_dict["POPE"])
 #membrane.visualize_polarity()
@@ -117,9 +127,12 @@ membrane.visualize_polarity()
 #### Membrane thickness related code ##########
 
 
-#mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
-#plt.close()
+mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
+plt.scatter(mat_thi.flatten(), mat_both.flatten())
+#plt.colorbar(cmap = "Spectral")
+plt.show()
+plt.close()
 #plt.scatter(mat_both.flatten(), mat_thi.flatten(), alpha = 0.5)
-#plt.savefig("corr_thilip.png")
-#plt.close()
+plt.savefig("corr_thilip.png")
+plt.close()
 #print(membrane.lipid_list)
