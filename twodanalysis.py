@@ -257,6 +257,7 @@ class twod_analysis:
 
 
         """
+
         angles = [] # Store the angles for the working carbon
         for i in (range(len(lista)-1)): # Accounts for variable number of list (Change if the carbon has or not double bonds)
             vectores = lista[i+1].positions - lista[0].positions # Hidrogen - Carbons; output of shape (n_lipids, 3)
@@ -300,11 +301,12 @@ class twod_analysis:
 
         # Define list to store the chain cos^2(theta)
         chains = []
+        print(lipid)
 
         # Loop over carbons
         for i in range(n_chain):
             # Define selections for H and C in the chain
-            print(f"Value of the chain {i} sn1")
+            #print(f"Value of the chain {i} sn1")
             selections = [
                             f"name C3{i+2}",
                             f"name H{i+2}X and not name HX",
@@ -383,9 +385,12 @@ class twod_analysis:
 
             for selection in selections:
                 atoms = sel.select_atoms(selection)
+                if atoms.n_atoms != 0:
+                    lista.append(atoms)
 
 
             angles = self.get_individual(lista)
+            #print(angles, "############################")
             if len(angles) > max_v:
                 max_v = len(angles)
             chains.append(angles)
@@ -458,8 +463,16 @@ class twod_analysis:
 
     @staticmethod
     def get_highest(data, min_lenght):
-        columns = ["index", "weight"] # Data expected is an np array with columns ["index", "x", "y", "z"]
+        """Code to get the highest value given two columns that are to be ordered in a 2D grid
 
+        Args:
+            data (ndarray(:,2)): Array with two columns (column1: map to a 2D grid, column2: values)
+            min_lenght (int): Size of squares in the 2D grid
+
+        Returns:
+            ndarray(:,2): With the maximun of each grid square
+        """
+        columns = ["index", "weight"] # Data expected is an np array with columns ["index", "x", "y", "z"]
         df = pd.DataFrame(data, columns = columns)
         result = df.groupby('index', as_index=False)['weight'].max()
         result_dict = dict(zip(result['index'], result['weight']))
@@ -629,9 +642,8 @@ class twod_analysis:
         for ts in self.u.trajectory[start:final:step]:
             z = all_head.positions[:,2]
             z_mean = z.mean() # get middel of the membrane
-            print(z_mean)
+
             #Pick atoms in the layer
-            print(type(layer))
             if layer == "both":
                 layer_at = self.memb.select_atoms(f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}))")
             else:
@@ -643,8 +655,8 @@ class twod_analysis:
             angles_sn1 = self.individual_order_sn1(layer_at, lipid, n_chain1)
             angles_sn1 = angles_sn1.T
 
-            #print(angles_sn1.T.shape, positions.shape)
-            #print(angles_sn1.shape, positions.shape)
+            print(angles_sn1.T.shape, positions.shape)
+            print(angles_sn1.shape, positions.shape)
             to_write = np.concatenate([positions, angles_sn1], axis = 1)
             if n_chain2 != 0:
                 angles_sn2 = self.individual_order_sn2(layer_at, lipid, n_chain2)
@@ -656,7 +668,8 @@ class twod_analysis:
 
         #matrix = np.array(matrix) # Expect dim (frames, n_lipids, 2+n_chain1+n_chain2)
         matrix = np.concatenate(matrix, axis = 0) # Expect dim (n_lipids*frames, 2+n_chain1+n_chain2)
-
+        v_min = self.v_min
+        v_max = self.v_max
 
         H, edges = self.histogram2D(matrix[:,:2], matrix[:,2:], n_chain, bins = n_grid, v_min = v_min, v_max = v_max)
         H = np.rot90(H)
@@ -706,7 +719,10 @@ class twod_analysis:
 
         lipid_list = list(self.lipid_list)
         lipid_list.remove("CHL1")
-        lipids = membrane.chain_info
+        lipids = self.chain_info
+
+        v_min = self.v_min
+        v_max = self.v_max
 
         matrices = []
         for key in lipid_list:
@@ -725,7 +741,7 @@ class twod_analysis:
         plt.close()
         plt.imshow(matrices[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
         plt.colorbar(cmap = "Spectral")
-        plt.savefig(f"all_lip_{layer}.png")
+        plt.savefig(f"all_lip1_{layer}.png")
         plt.close()
         return matrices, edges
 
@@ -784,7 +800,18 @@ class twod_analysis:
             mean_z = positions.mean()
 
             # Selects the lipid head and of the working lipid
-            if layer == "both":build_
+            if layer == "both":
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']})"
+            else:
+                selection_string = f"(resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {str(mean_z)}"
+
+            # Find the positions of the P atoms
+            atoms = self.u.select_atoms(selection_string)
+
+            ### Get positions
+            atom_pos = atoms.positions
+
+
             ### Get resids
             atom_resid = atoms.resids
             atom_resid = atom_resid[:,np.newaxis]
@@ -804,26 +831,42 @@ class twod_analysis:
         #    df_data.to_csv(f"pd_{filename}", index = False)
         df_data.to_csv(f"pd_{filename}", index = False)
 
-        return df_data   # Maybe have to change, it does not make sense to return this
+        return df_data   # Maybe have to change, it does not make sense to return thi
 
+
+    def height_matrix(self, lipids, layer,start = None, final = None, step = None, nbins = 50, clean = True):
+
+        if start == None:
+            start = self.start
+        if final == None:
+            final = self.final
+        if step == None:
+            step = self.step
 
 
         print(f"Computing matrix for {layer} in frames {start}-{final}")
         data = []
         for lipid in lipids:
             filename = f"{lipid}_{layer}_{start}-{final}.dat"
-            print(filename)
-            try:
-                df_data = pd.read_csv(f"pd_{filename}")
-            except:
+            if not clean:
+                try:
+                    df_data = pd.read_csv(f"pd_{filename}")
+                except:
+                    self.surface(lipid = lipid, layer = layer, filename = filename, include_charge = True, start = start, final = final)
+                    df_data = pd.read_csv(f"pd_{filename}")
+            else:
                 self.surface(lipid = lipid, layer = layer, filename = filename, include_charge = True, start = start, final = final)
                 df_data = pd.read_csv(f"pd_{filename}")
+
             data.append(df_data)
 
         data = pd.concat(data, axis = 0)
+        print(data)
+        xmin = data["x"].min()
+        xmax = data["x"].max()
+        ymin = data["y"].min()
+        ymax = data["y"].max()
 
-
-        #print(data)
         xmin = self.v_min
         xmax = self.v_max
         ymin = self.v_min
@@ -863,14 +906,15 @@ class twod_analysis:
                         start = start,
                         final = final,
                         step = step,
-                        nbins = 50)
+                        nbins = nbins)
         matrix_bot, edges = self.height_matrix(lipids,
                         "bot",
                         start = start,
                         final = final,
                         step = step,
-                        nbins = 50)
-        mat_thickness = np.nansum(np.array([matrix_up, matrix_bot]),axis = 0)
+                        nbins = nbins)
+        mat_thickness = np.sum(np.array([matrix_up, matrix_bot]),axis = 0)
+        mat_thickness[mat_thickness == 0] = np.nan
         print(mat_thickness,mat_thickness.shape,matrix_bot.shape,[edges[0], edges[-1], edges[0], edges[-1]])
         plt.close()
         plt.imshow(mat_thickness[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0], edges[-1], edges[0], edges[-1]])
