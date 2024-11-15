@@ -887,9 +887,10 @@ class twod_analysis:
         np.savetxt(f"edges_{layer}_{start}_{final}.dat", x_edges, fmt = "%.2f")
         return H_avg, x_edges
 
-    def thickness(self, nbins, start = 0, final=-1, step = 1):
-        """_summary_
 
+
+    def thickness(self, nbins, start = 0, final=-1, step = 1):
+        """Find the thichness mapped in a 2d grid
         Args:
             nbins (int): number of bins for thickness
             start (int, optional): Start frame. Defaults to 0.
@@ -926,6 +927,11 @@ class twod_analysis:
 
 
     def guess_minmax_space(self):
+        """Check the minimun and max position in x,y
+
+        Returns:
+            float, float: minimun and max position in x,y
+        """
         positions = self.memb.positions[:,2]
         vmin = np.min(positions)
         vmax = np.max(positions)
@@ -933,7 +939,7 @@ class twod_analysis:
 
     @staticmethod
     def create_circle_array(grid_size, radius_A, center=None):
-        """_summary_
+        """Create a small matrix with a inner circle of the size of radius_A
 
         Args:
             grid_size (float): define the grid size to create the optimun grid (Amstrongs)
@@ -969,6 +975,17 @@ class twod_analysis:
 
     @staticmethod
     def add_small_matrix(big_matrix, small_matrix, center_i, center_j):
+        """Add smmall matrix to a big matrix
+
+        Args:
+            big_matrix (ndarray(n,n)): big matrix where a small  matrix will be added
+            small_matrix (ndarray(m,m)): small matrix to be added
+            center_i (int): i coordinate
+            center_j (int): j coordunate
+
+        Returns:
+            big_matrix (ndarray(n,n)): big matrix modified
+        """
 
     # Calculate the top-left corner of the submatrix in big_matrix
         start_i = center_i - small_matrix.shape[0] // 2
@@ -1000,15 +1017,26 @@ class twod_analysis:
                     names,
                     lipid,
                     mat_radii_dict):
+        """ Code to easily add deffects in the 2d matrix
+        Args:
+            matrix (ndarray(n,n)): Matrix where the deffects are going to be added
+            indexes (ndarray(i,j)): List of indexes i,j in the matrix where the deffects should be added
+            elements (list): type of element (needed to put the right radious)
+            names (list): names of the atoms (needed to map hydrophobic and not hydrophobic atoms)
+            lipid (str): lipid name
+            mat_radii_dict (dict): dictionary with the radii
+
+        Returns:
+            ndarray: matrix matrix filled with the deffects
+        """
         matrix = matrix
-        #print("names", names, "mat_radii_dict", mat_radii_dict)
+
         for i in range(len(indexes[0])):
 
             small_matrix = mat_radii_dict[elements[i]]
 
             if names[i] in self.non_polar_dict[lipid]:
                 small_matrix = small_matrix * 0.0001
-            #print(small_matrix, indexes[0][i], indexes[1][i])
             self.add_small_matrix(matrix, small_matrix, indexes[0][i], indexes[1][i])
         return matrix
 
@@ -1087,40 +1115,30 @@ class twod_analysis:
             matrix_height = np.zeros((nbins+2, nbins+2))
         positions = all_p.positions[:,2]
         mean_z = positions.mean()
-        #self.lipid_list.remove("DODMA")
-        #self.lipid_list.remove("POPE")
-        #self.lipid_list.remove("CHL1")
+
         for lipid in self.lipid_list:
             selection_string = f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z})"
-            #all_lip = self.memb.select_atoms(f"resname {lipid}")
+
             layer_at = self.memb.select_atoms(selection_string)
 
-            if lipid == "POPE":
-                print(f"Boool test H91, {'H91' in self.non_polar_dict[lipid]}")
-                print(f"Boool test H101, {'H101' in self.non_polar_dict[lipid]}")
-            #print("names",len(layer_at.residues.resids), len(all_lip.residues.resids), mean_z, np.mean(layer_at.positions[:,2]))
+
             pos_ats = layer_at.positions
             if not height:
                 indexes = self.get_indexes(pos_ats[:,:2], nbins)
             else:
                 indexes, matrix_temp = self.get_indexes(pos_ats, nbins, matrix_height = True)
-                #print("test dimensions:", matrix.shape, matrix_height.shape)
-                 #print(matrix_height[20, :], matrix_temp[20,:])
+
                 matrix_height = np.maximum(matrix_height.copy(), matrix_temp.copy())
-                #print(matrix_height[20, :])
+
             elements = layer_at.elements
             names = layer_at.names
-            #print(layer_at.residues.resids)
-            #layer_at.write("layer.gro")
-            #plt.scatter(*pos_ats[:,:2].T)
-            #plt.show()
+
             matrix = self.add_deffects(matrix, indexes,elements, names, lipid, mat_radii_dict)
 
 
         deffects = np.where(matrix < 1, matrix, np.nan)
-        print(deffects, deffects.shape, deffects[0],matrix.shape)
-        #deffects = matrix
-        #deffects[deffects == 0 ] = np.nan
+
+
         if height:
             matrix_height[matrix_height == 0 ] = np.nan
             return deffects, matrix_height
