@@ -66,10 +66,10 @@ layer = "top"
 #                        final = 100,
 #                        step = 1)
 
-mat_both, edges = membrane.all_lip_order("both", nbins,
-                        start = 0,
-                        final = 100,
-                        step = 1)
+#mat_both, edges = membrane.all_lip_order("both", nbins,
+#                        start = 0,
+#                        final = 100,
+#                        step = 1)
 
 #plt.imshow(mat_top, cmap = "Spectral")
 #plt.show()
@@ -115,24 +115,29 @@ for key in lipid_polar.keys():
 
 #print(membrane.non_polar_dict["POPE"])
 #membrane.visualize_polarity()
-#matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
-#fig,ax = plt.subplots(1,2)
-#ax[0].imshow(np.rot90(matrix))
-#ax[1].imshow(np.rot90(matrix_height))
-#plt.show()
+for ts in membrane.u.trajectory[:20]:
+    matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
+    fig,ax = plt.subplots(1,2)
+    ax[0].imshow(np.rot90(matrix))
+    ax[1].imshow(np.rot90(matrix_height))
+    plt.show()
 
 
 
 
 #### Membrane thickness related code ##########
 
+#mat_both, edges = membrane.all_lip_order("both", nbins,
+#                        start = 0,
+#                        final = 100,
+#                        step = 1)
 
-mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
-plt.scatter(mat_thi.flatten(), mat_both.flatten())
+#mat_thi, edges = membrane.thickness(50, start = 0, final = 100, step = 1)
+#plt.scatter(mat_thi.flatten(), mat_both.flatten())
 #plt.colorbar(cmap = "Spectral")
-plt.show()
-plt.close()
+#plt.show()
+#plt.close()
 #plt.scatter(mat_both.flatten(), mat_thi.flatten(), alpha = 0.5)
-plt.savefig("corr_thilip.png")
-plt.close()
+#plt.savefig("corr_thilip.png")
+#plt.close()
 #print(membrane.lipid_list)
