@@ -715,7 +715,24 @@ class twod_analysis:
                         all_head = None,
                         start = None,
                         final = None,
-                        step = 1):
+                        step = 1,
+                        plot = False):
+        """Find the 2D order parameters for all lipids
+
+        Args:
+            layer (str): Layer, can be top, bot, both
+            nbins (int): number of bins
+            v_min (float, optional): min value for the grid. Defaults to None.
+            v_max (float, optional): max value for the grid. Defaults to None.
+            all_head (_type_, optional): _description_. Defaults to None.
+            start (int, optional): start frame. Defaults to None.
+            final (int, optional): final frame. Defaults to None.
+            step (int, optional): step. Defaults to 1.
+            plot (Bool, optional): plot the resulting matrix. Defaults to False
+
+        Returns:
+            ndarray(n,n), ndarray(n+1): matrix containing the 2d order, edges of the matrix
+        """
 
         lipid_list = list(self.lipid_list)
         lipid_list.remove("CHL1")
@@ -736,13 +753,15 @@ class twod_analysis:
 
             matrices.append(H)
         matrices = np.array(matrices)
-        print(matrices.shape)
         matrices = np.nanmean(matrices, axis = 0)
-        plt.close()
-        plt.imshow(matrices[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
-        plt.colorbar(cmap = "Spectral")
-        plt.savefig(f"all_lip1_{layer}.png")
-        plt.close()
+
+        if plot:
+            plt.close()
+            plt.imshow(matrices[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0][0], edges[0][-1], edges[1][0], edges[1][-1]])
+            plt.colorbar(cmap = "Spectral")
+            plt.savefig(f"all_lip1_{layer}.png")
+            plt.close()
+
         return matrices, edges
 
     def surface(self,
@@ -752,16 +771,16 @@ class twod_analysis:
                 lipid = "DSPC",
                 layer = 'top',
                 filename = None, include_charge = False):
-        """_summary_
+        """Code to loop over the trajectory and print [x,y,z(referenced to zmean), charge] in a file.
 
         Args:
-            start (_type_, optional): _description_. Defaults to None.
-            final (_type_, optional): _description_. Defaults to None.
-            step (_type_, optional): _description_. Defaults to None.
-            lipid (str, optional): _description_. Defaults to "DSPC".
-            layer (str, optional): _description_. Defaults to 'top'.
-            filename (_type_, optional): _description_. Defaults to None.
-            include_charge (bool, optional): _description_. Defaults to False.
+            start (int, optional): Start Frame. Defaults to None.
+            final (int, optional): Final frame. Defaults to None.
+            step (int, optional): Frames to skip. Defaults to None.
+            lipid (str, optional): Lipid to work. Defaults to "DSPC".
+            layer (str, optional): Layer to work. Defaults to 'top'.
+            filename (str, optional): filename to write data. Defaults to None.
+            include_charge (bool, optional): Include or not charge. Defaults to False.
 
         Returns:
             _type_: _description_
@@ -775,6 +794,8 @@ class twod_analysis:
         if filename == None:
             filename = f"{lipid}_{layer}_{start}_{final}.dat"
         lipid_list = self.lipid_list
+
+
         print("######### Running surface function ########## ")
         print(f"We will compute the surface files for a membrane with there lipids {lipid_list}")
         print(f"Currently working on: {lipid}")
