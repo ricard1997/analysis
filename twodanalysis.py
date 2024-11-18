@@ -856,6 +856,20 @@ class twod_analysis:
 
 
     def height_matrix(self, lipids, layer,start = None, final = None, step = None, nbins = 50, clean = True):
+        """Code to divide the space in a 2D grid and compute the height referenced to zmean
+
+        Args:
+            lipids (list(str)): Lipids to include in the height analysis
+            layer (str): Working layer for thickness
+            start (int, optional): Frame to start analysis. Defaults to None.
+            final (int, optional): Final frame for the analysis. Defaults to None.
+            step (int, optional): Steps to skip. Defaults to None.
+            nbins (int, optional): Number of bins to divide the grid space. Defaults to 50.
+            clean (bool, optional): Decide if rerun and overwrite surface generated files. Defaults to True.
+
+        Returns:
+            ndarray(nbins,nbins): Retun a matrix with the height information
+        """
 
         if start == None:
             start = self.start
