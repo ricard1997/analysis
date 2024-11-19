@@ -961,15 +961,22 @@ class twod_analysis:
 
 
 
-    def guess_minmax_space(self):
+    def guess_minmax_space(self, all = False):
         """Check the minimun and max position in x,y
 
         Returns:
             float, float: minimun and max position in x,y
         """
         positions = self.memb.positions[:,2]
+        if all:
+            xmin = np.min(positions[:,0])
+            xmax = np.max(positions[:,0])
+            ymin = np.min(positions[:,1])
+            ymax = np.max(positions[:,1])
+            return xmin, xmax, ymin, ymax
         vmin = np.min(positions)
         vmax = np.max(positions)
+
         return vmin,vmax
 
     @staticmethod
@@ -1172,6 +1179,39 @@ class twod_analysis:
             matrix_height[matrix_height == 0 ] = np.nan
             return deffects, matrix_height
         return deffects
+
+
+
+    ####### Code related to area per lipid using voronoi tesselation and delunay triangulations
+
+    # This part needs scypy to process data
+
+    def voronoi_apl(self,
+                        layer = 'top',
+                        ):
+
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
+            sign = " < "
+        lipid_list = list(self.lipid_list)
+        print(self.lipid_list)
+
+
+        all_p = self.all_head
+        positions = all_p.positions[:,2]
+        mean_z = positions.mean()
+
+        selection_string = f"(((resname {lipid_list[0]} and name {self.working_lip[lipid_list[0]]['head']}) and prop z {sign} {mean_z}))"
+        for lipid in lipid_list[1:]:
+            selection_string += f" or (((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z}))"
+
+        print(selection_string)
+        heads = self.memb.select_atoms(selection_string)
+        heads_pos = heads.positions[:,:2]
+        return heads_pos
+
+
 
 
 
