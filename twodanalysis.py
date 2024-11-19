@@ -1199,17 +1199,96 @@ class twod_analysis:
 
 
         all_p = self.all_head
-        positions = all_p.positions[:,2]
-        mean_z = positions.mean()
+        positions = all_p.positions
+
+        xmin = np.min(positions[:,0])
+        xmax = np.max(positions[:,0])
+        ymin = np.min(positions[:,1])
+        ymax = np.max(positions[:,1])
+
+        dist_x = xmax - xmin
+        dist_y = ymax - ymin
+
+
+        mean_z = positions[:,2].mean()
 
         selection_string = f"(((resname {lipid_list[0]} and name {self.working_lip[lipid_list[0]]['head']}) and prop z {sign} {mean_z}))"
         for lipid in lipid_list[1:]:
             selection_string += f" or (((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z}))"
 
         print(selection_string)
+
+
         heads = self.memb.select_atoms(selection_string)
         heads_pos = heads.positions[:,:2]
-        return heads_pos
+        orig_len = len(heads_pos)
+
+
+        ## Extent data
+        dimensions = self.u.trajectory.ts.dimensions[:3]
+        cons = 0.1
+        # Extent in x
+        left_add = heads_pos[heads_pos[:,0] <= xmin + cons*dist_x] + [dimensions[0],0]
+        right_add = heads_pos[heads_pos[:,0] >= xmax - cons*dist_x] - [dimensions[0],0]
+        heads_pos = np.concatenate([heads_pos, left_add, right_add], axis = 0)
+        # Extent in y
+        up_add = heads_pos[heads_pos[:,1] <= ymin + cons*dist_y] + [0,dimensions[0]]
+        low_add = heads_pos[heads_pos[:,1] >= ymax - cons   *dist_y] - [0,dimensions[0]]
+        heads_pos = np.concatenate([heads_pos, up_add, low_add], axis = 0)
+
+
+        from scipy.spatial import Voronoi, voronoi_plot_2d
+        from scipy.spatial import ConvexHull
+
+        voronoi_dict = {"vertices":list(),
+                        "points":heads_pos[:orig_len],
+                        "areas":list(),
+                        "resnames":heads.resnames,
+                         }
+        voronoi = Voronoi(heads_pos)
+        vertices = voronoi.vertices
+
+        resnames = list(set(voronoi_dict["resnames"]))
+        result_dict = {}
+        for lipid in resnames:
+            result_dict[lipid] = list()
+
+        for i, region in enumerate(voronoi.point_region[:orig_len]):
+            if -1 in voronoi.regions[region]:
+                continue
+            vertex = vertices[voronoi.regions[region]]
+            hull = ConvexHull(vertex)
+            area = hull.volume
+            voronoi_dict["areas"].append(area)
+            result_dict[voronoi_dict["resnames"][i]].append(area)
+
+            voronoi_dict["vertices"].append(vertex)
+
+        for lipid in resnames:
+            result_dict[lipid] = np.mean(np.array(result_dict[lipid]))
+
+        voronoi_dict["apl"] = result_dict
+
+
+
+        return voronoi_dict
+
+
+        def map_voronoi(self, voronoi_vertices):
+            continue
+
+
+
+
+
+
+
+        #fig = voronoi_plot_2d(voronoi)
+        #plt.xlim(xmin,xmax)
+        #plt.ylim(ymin,ymax)
+        #plt.show()
+
+        #return heads_pos
 
 
 
