@@ -17,12 +17,12 @@ top = "dopcchol_Charmm.pdb"
 traj = "dopcchol_Charmm.pdb"
 tpr = "veamos.tpr"
 
-top = "../../centered_prot.gro"
-traj = "../../centered_prot.xtc"
-tpr = "../../veamos.tpr"
+#top = "../../centered_prot.gro"
+#traj = "../../centered_prot.xtc"
+#tpr = "../../veamos.tpr"
 
-#top = "membrane.gro"
-#traj = "membrane.xtc"
+top = "membrane.gro"
+traj = "membrane.xtc"
 
 # Creating the class
 
@@ -118,6 +118,7 @@ for key in lipid_polar.keys():
 #membrane.visualize_polarity()
 
 #print(membrane.non_polar_dict["POPE"])
+"""
 membrane.visualize_polarity()
 membrane.non_polar_dict["POPI24"].append("H91")
 membrane.non_polar_dict["POPI24"].append("H101")
@@ -150,7 +151,7 @@ with imageio.get_writer("gif_packing.gif", mode = "I", duration = 0.3) as writer
 for filename in filenames:
     os.remove(filename)
 
-
+"""
 
 
 
@@ -171,3 +172,30 @@ for filename in filenames:
 #plt.savefig("corr_thilip.png")
 #plt.close()
 #print(membrane.lipid_list)
+
+
+
+
+###### Code to test apl ######
+
+
+voronoi_dict = membrane.voronoi_apl(layer = "top")
+
+
+colors = {"DODMA": "blue",
+        "POPE": "red",
+        "DSPC": "green",
+        "CHL1": "yellow"
+}
+plt.scatter(*voronoi_dict["points"].T, c =[colors[lipid] for lipid in voronoi_dict["resnames"]])
+count = 0
+for vertices in voronoi_dict["vertices"]:
+
+    temp = vertices
+    temp = np.concatenate([temp, [temp[0]]])
+    plt.plot(*temp.T, c = colors[voronoi_dict["resnames"][count]])
+    count+=1
+print(membrane.print_dict(voronoi_dict["apl"]))
+plt.show()
+
+
