@@ -93,8 +93,8 @@ class twod_analysis:
                                 "DSPE" : {"head" :"P", "charge" : 1.3},
                                 "DOPC" : {"head" :"P", "charge" : 1.3},
                                 "DOPE" : {"head" :"P", "charge" : 1.3},
-                                "POPI1" : {"head" :"P", "charge" : 1.3},
-                                "POPI2" : {"head" :"P", "charge" : 1.3},
+                                "POPI15" : {"head" :"P", "charge" : 1.3},
+                                "POPI24" : {"head" :"P", "charge" : 1.3},
                             } #List of known lipids and lipids head people usually use to work
 
         self.chain_info = chain_info
@@ -951,7 +951,7 @@ class twod_analysis:
                         nbins = nbins)
         mat_thickness = np.sum(np.array([matrix_up, matrix_bot]),axis = 0)
         mat_thickness[mat_thickness == 0] = np.nan
-        print(mat_thickness,mat_thickness.shape,matrix_bot.shape,[edges[0], edges[-1], edges[0], edges[-1]])
+        #print(mat_thickness,mat_thickness.shape,matrix_bot.shape,[edges[0], edges[-1], edges[0], edges[-1]])
         plt.close()
         plt.imshow(mat_thickness[1:-1,1:-1] ,cmap = "Spectral", extent = [edges[0], edges[-1], edges[0], edges[-1]])
         plt.colorbar(cmap = "Spectral")
@@ -1077,9 +1077,6 @@ class twod_analysis:
 
 
     def packing_defects(self,
-                        start = None,
-                        final = None,
-                        step = None,
                         layer = 'top',
                         nbins = 180,
                         height = False,
@@ -1102,12 +1099,7 @@ class twod_analysis:
 
 
 
-        if start == None:
-            start = self.start
-        if final == None:
-            final = self.final
-        if step == None:
-            step = self.step
+
 
         vmin = self.v_min
         vmax = self.v_max
@@ -1152,8 +1144,10 @@ class twod_analysis:
         mean_z = positions.mean()
 
         for lipid in self.lipid_list:
-            selection_string = f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z})"
 
+
+            selection_string = f"byres ((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z})"
+            #print(selection_string)
             layer_at = self.memb.select_atoms(selection_string)
 
 
@@ -1170,9 +1164,9 @@ class twod_analysis:
 
             matrix = self.add_deffects(matrix, indexes,elements, names, lipid, mat_radii_dict)
 
-
+        deffects = matrix
         deffects = np.where(matrix < 1, matrix, np.nan)
-
+        deffects = np.where(deffects > 0, deffects, np.nan)
 
         if height:
             matrix_height[matrix_height == 0 ] = np.nan
