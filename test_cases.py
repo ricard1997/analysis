@@ -8,7 +8,8 @@ import time
 from matplotlib.patches import Patch
 import nglview as nv
 from twodanalysis import twod_analysis
-
+import imageio
+import os
 
 
 
@@ -16,19 +17,22 @@ top = "dopcchol_Charmm.pdb"
 traj = "dopcchol_Charmm.pdb"
 tpr = "veamos.tpr"
 
+top = "../../centered_prot.gro"
+traj = "../../centered_prot.xtc"
+tpr = "../../veamos.tpr"
 
-top = "membrane.gro"
-traj = "membrane.xtc"
+#top = "membrane.gro"
+#traj = "membrane.xtc"
 
 # Creating the class
+
 membrane = twod_analysis(top,
                          traj,
                         tpr=tpr,
                         v_min = -10,
-                        v_max = 180,
+                        v_max = 190,
                         verbose = True,
                         add_radii = True)
-
 
 
 
@@ -83,8 +87,8 @@ layer = "top"
 
 
 # Adding POPE lipids that are not taken into account
-membrane.non_polar_dict["POPE"].append("H101")
-membrane.non_polar_dict["POPE"].append("H91")
+#membrane.non_polar_dict["POPE"].append("H101")
+#membrane.non_polar_dict["POPE"].append("H91")
 
 """ Print selections to test packing deffects with VMD
 lipid_polar = {}
@@ -114,13 +118,39 @@ for key in lipid_polar.keys():
 #membrane.visualize_polarity()
 
 #print(membrane.non_polar_dict["POPE"])
-#membrane.visualize_polarity()
-for ts in membrane.u.trajectory[:20]:
-    matrix, matrix_height = membrane.packing_defects(start = 0, final = 10, step =1,nbins = 180, layer = "top", height = True)
+membrane.visualize_polarity()
+membrane.non_polar_dict["POPI24"].append("H91")
+membrane.non_polar_dict["POPI24"].append("H101")
+membrane.non_polar_dict["POPI15"].append("H91")
+membrane.non_polar_dict["POPI15"].append("H101")
+membrane.visualize_polarity()
+count = 0
+filenames = []
+for ts in membrane.u.trajectory[51::3]:
+    matrix, matrix_height = membrane.packing_defects(
+                                    nbins = 200,
+                                    layer = "bot",
+                                    height = True,
+
+                                    )
     fig,ax = plt.subplots(1,2)
     ax[0].imshow(np.rot90(matrix))
     ax[1].imshow(np.rot90(matrix_height))
-    plt.show()
+    ax[0].set_title(f"Frame {count}")
+    plt.savefig(f"frame_{count}.png")
+
+    filenames.append(f"frame_{count}.png")
+    count += 1
+
+with imageio.get_writer("gif_packing.gif", mode = "I", duration = 0.3) as writer:
+    for filename in filenames:
+        image = imageio.imread(filename)
+        writer.append_data(image)
+
+for filename in filenames:
+    os.remove(filename)
+
+
 
 
 
