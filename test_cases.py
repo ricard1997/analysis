@@ -187,6 +187,7 @@ colors = {"DODMA": "blue",
         "DSPC": "green",
         "CHL1": "yellow"
 }
+"""
 plt.scatter(*voronoi_dict["points"].T, c =[colors[lipid] for lipid in voronoi_dict["resnames"]])
 count = 0
 for vertices in voronoi_dict["vertices"]:
@@ -197,5 +198,9 @@ for vertices in voronoi_dict["vertices"]:
     count+=1
 print(membrane.print_dict(voronoi_dict["apl"]))
 plt.show()
+"""
+
+membrane.map_voronoitest(voronoi_dict["vertices"], voronoi_dict["areas"], 100, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
+membrane.map_voronoi(voronoi_dict["points"], voronoi_dict["areas"], 300, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
 
 
