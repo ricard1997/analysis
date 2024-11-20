@@ -29,8 +29,6 @@ traj = "membrane.xtc"
 membrane = twod_analysis(top,
                          traj,
                         tpr=tpr,
-                        v_min = -10,
-                        v_max = 190,
                         verbose = True,
                         add_radii = True)
 
@@ -200,7 +198,7 @@ print(membrane.print_dict(voronoi_dict["apl"]))
 plt.show()
 """
 
-membrane.map_voronoitest(voronoi_dict["vertices"], voronoi_dict["areas"], 100, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
-membrane.map_voronoi(voronoi_dict["points"], voronoi_dict["areas"], 300, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
+#membrane.map_voronoitest(voronoi_dict["vertices"], voronoi_dict["areas"], 100, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
+#membrane.map_voronoi(voronoi_dict["points"], voronoi_dict["areas"], 300, [membrane.v_min, membrane.v_max, membrane.v_min, membrane.v_max])
 
-
+membrane.grid_apl(layer = "top", start = 0, final = 100, step = 1, lipid_list = None)
