@@ -21,8 +21,8 @@ class twod_analysis:
                 info = False,
                 guess_chain_l = True,
                 chain_info = None,
-                v_min = 0,
-                v_max = 180,
+                v_min = None,
+                v_max = None,
                 add_radii = False,
                 verbose = False,
             ):
@@ -81,8 +81,7 @@ class twod_analysis:
 
 
 
-        self.v_min = v_min
-        self.v_max = v_max
+
         self.working_lip = {
                                 "CHL1" : {"head" :"O3", "charge" : 0},
                                 "DODMA" : {"head" :"N1", "charge" : -0.21},
@@ -128,6 +127,10 @@ class twod_analysis:
 
 
         self.all_head = self.u.select_atoms(self.build_resname(self.lipid_list) + " and name P")
+        if v_min == None and v_max == None:
+            positions = self.all_head.positions[:,:2]
+            self.v_min = np.min(positions)
+            self.v_max = np.max(positions)
         self.start = 0
         self.final = 100
         self.step = 1
@@ -1221,8 +1224,9 @@ class twod_analysis:
 
         heads = self.memb.select_atoms(selection_string)
         heads_pos = heads.positions[:,:2]
+        resnames_pos = heads.resnames
         orig_len = len(heads_pos)
-
+        print(heads_pos.shape, resnames_pos.shape)
 
         ## Extent data
         dimensions = self.u.trajectory.ts.dimensions[:3]
@@ -1230,11 +1234,29 @@ class twod_analysis:
         # Extent in x
         left_add = heads_pos[heads_pos[:,0] <= xmin + cons*dist_x] + [dimensions[0],0]
         right_add = heads_pos[heads_pos[:,0] >= xmax - cons*dist_x] - [dimensions[0],0]
+
+
+        left_add_resn = resnames_pos[heads_pos[:,0] <= xmin + cons*dist_x]
+        right_add_resn = resnames_pos[heads_pos[:,0] >= xmax - cons*dist_x]
+
+
         heads_pos = np.concatenate([heads_pos, left_add, right_add], axis = 0)
+        resnames_pos = np.concatenate([resnames_pos, left_add_resn, right_add_resn], axis = 0)
+
+        print(heads_pos.shape, resnames_pos.shape)
         # Extent in y
         up_add = heads_pos[heads_pos[:,1] <= ymin + cons*dist_y] + [0,dimensions[0]]
         low_add = heads_pos[heads_pos[:,1] >= ymax - cons   *dist_y] - [0,dimensions[0]]
+
+
+        up_add_resn = resnames_pos[heads_pos[:,1] <= ymin + cons*dist_y]
+        low_add_resn = resnames_pos[heads_pos[:,1] >= ymax - cons*dist_y]
+
+        print(up_add.shape, low_add.shape, up_add_resn.shape, low_add_resn.shape, heads_pos.shape, resnames_pos.shape)
+
         heads_pos = np.concatenate([heads_pos, up_add, low_add], axis = 0)
+        resnames_pos = np.concatenate([resnames_pos, up_add_resn, low_add_resn], axis = 0)
+        print(heads_pos.shape, resnames_pos.shape)
 
 
         from scipy.spatial import Voronoi, voronoi_plot_2d
@@ -1243,7 +1265,7 @@ class twod_analysis:
         voronoi_dict = {"vertices":list(),
                         "points":heads_pos[:orig_len],
                         "areas":list(),
-                        "resnames":heads.resnames,
+                        "resnames":resnames_pos,
                          }
         voronoi = Voronoi(heads_pos)
         vertices = voronoi.vertices
@@ -1253,7 +1275,8 @@ class twod_analysis:
         for lipid in resnames:
             result_dict[lipid] = list()
 
-        for i, region in enumerate(voronoi.point_region[:orig_len]):
+        #for i, region in enumerate(voronoi.point_region[:orig_len]):
+        for i, region in enumerate(voronoi.point_region):
             if -1 in voronoi.regions[region]:
                 continue
             vertex = vertices[voronoi.regions[region]]
@@ -1269,13 +1292,13 @@ class twod_analysis:
 
         voronoi_dict["apl"] = result_dict
 
-        voronoi_plot_2d(voronoi)
-        for region in voronoi.regions:
-            if not -1 in region:
-                polygon = [voronoi.vertices[i] for i in region]
-                plt.fill(*zip(*polygon))
+        #voronoi_plot_2d(voronoi)
+        #for region in voronoi.regions:
+        #    if not -1 in region:
+        #        polygon = [voronoi.vertices[i] for i in region]
+        #        plt.fill(*zip(*polygon))
 
-        plt.show()
+        #plt.show()
 
 
 
@@ -1294,6 +1317,8 @@ class twod_analysis:
         xmax =dimensions[1]
         ymin =dimensions[2]
         ymax =dimensions[3]
+
+
 
         xcoords = np.linspace(xmin, xmax, nbins)
         ycoords = np.linspace(ymin, ymax, nbins)
@@ -1327,6 +1352,91 @@ class twod_analysis:
         grid = voronoi_areas[closest_seed_indices].reshape(nbins, nbins)
 
         return grid, dimensions
+
+
+
+    def grid_apl(self,layer = "top", start = 0, final = -1, step = 1, lipid_list = None):
+        if lipid_list == None:
+            lipid_list = list(self.lipid_list)
+        if layer == "top":
+            sign = " > "
+        elif layer == "bot":
+            sign = " < "
+
+
+        all_p = self.all_head
+        positions = all_p.positions
+        mean_z = positions[:,2].mean()
+
+        xmin = self.v_min
+        xmax = self.v_max
+        ymin = self.v_min
+        ymax = self.v_max
+
+
+        #xmin1 = np.min(positions[:,0])
+        #xmax1 = np.max(positions[:,0])
+        #ymin1 = np.min(positions[:,1])
+        #ymax1 = np.max(positions[:,1])
+
+        #dist_x = xmax1 - xmin1
+        #dist_y = ymax1 - ymin1
+
+        matrices = []
+        for ts in self.u.trajectory[start:final:step]:
+
+            selection_string = f"(((resname {lipid_list[0]} and name {self.working_lip[lipid_list[0]]['head']}) and prop z {sign} {mean_z}))"
+            for lipid in lipid_list[1:]:
+                selection_string += f" or (((resname {lipid} and name {self.working_lip[lipid]['head']}) and prop z {sign} {mean_z}))"
+
+            heads = self.memb.select_atoms(selection_string)
+
+            head_pos = heads.positions[:2]
+            voronoi_dict = self.voronoi_apl(layer = layer)
+            matrix,_ = self.map_voronoi(voronoi_dict["points"], voronoi_dict["areas"], 200, [xmin, xmax, ymin, ymax])
+            matrices.append(matrix)
+            print(matrix.shape)
+
+
+
+
+        final_mat = np.mean(np.array(matrices), axis = 0)
+
+        print(f"final_mat {np.array(matrices).shape}")
+        #fig , ax = plt.subplots(1,len(matrices)+1)
+        count = 0
+        indices = []
+        for mat in matrices:
+            #ax[count].imshow(mat, cmap = "Spectral")
+            x_ref = matrices[0].flatten()
+            y = mat.flatten()
+            #ax[count].scatter(x_ref,y)
+
+            indices.append(np.corrcoef(x_ref, y)[0,1])
+            count +=1
+        #ax[count].imshow(final_mat, cmap = "Spectral")
+        #plt.show()
+
+
+        plt.plot(indices)
+        plt.show()
+        return final_mat
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def process_point(self, point, tree, polygons, values):
