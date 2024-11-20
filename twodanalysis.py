@@ -1269,13 +1269,82 @@ class twod_analysis:
 
         voronoi_dict["apl"] = result_dict
 
+        voronoi_plot_2d(voronoi)
+        for region in voronoi.regions:
+            if not -1 in region:
+                polygon = [voronoi.vertices[i] for i in region]
+                plt.fill(*zip(*polygon))
+
+        plt.show()
+
 
 
         return voronoi_dict
 
 
-        def map_voronoi(self, voronoi_vertices):
-            continue
+    def map_voronoitest(self,voronoi_vertices, voronoi_areas, nbins, dimensions):
+
+        from shapely.geometry import Polygon, Point
+        from shapely.strtree import STRtree
+
+        voronois = [Polygon(vertices) for vertices in voronoi_vertices]
+        tree = STRtree(voronois)
+
+        xmin =dimensions[0]
+        xmax =dimensions[1]
+        ymin =dimensions[2]
+        ymax =dimensions[3]
+
+        xcoords = np.linspace(xmin, xmax, nbins)
+        ycoords = np.linspace(ymin, ymax, nbins)
+
+        xx, yy = np.meshgrid(xcoords, ycoords)
+        points = np.vstack([xx.ravel(), yy.ravel()])
+        grid_values = np.array([self.process_point(point, tree, voronois, voronoi_areas) for point in points.T])
+        grid = grid_values.reshape(nbins, nbins)
+        plt.imshow(grid, cmap = "Spectral")
+        plt.show()
+
+    def map_voronoi(self, voronoi_points, voronoi_areas, nbins, dimensions):
+        xmin =dimensions[0]
+        xmax =dimensions[1]
+        ymin =dimensions[2]
+        ymax =dimensions[3]
+
+        xcoords = np.linspace(xmin, xmax, nbins)
+        ycoords = np.linspace(ymin, ymax, nbins)
+
+        xx, yy = np.meshgrid(xcoords, ycoords)
+        grid_points = np.vstack([xx.ravel(), yy.ravel()]).T
+        points = voronoi_points
+
+        distances = np.linalg.norm(grid_points[:,None, :]- points[None,:,:], axis = 2)
+
+
+        closest_seed_indices = np.argmin(distances, axis=1).astype(int)
+
+        voronoi_areas = np.array(voronoi_areas)
+        grid = voronoi_areas[closest_seed_indices].reshape(nbins, nbins)
+
+        return grid, dimensions
+
+
+    def process_point(self, point, tree, polygons, values):
+        from shapely.geometry import Polygon, Point
+        point_geom = Point(point[0], point[1])
+        polygon_value_map = dict(zip(polygons, values))
+        candidates = tree.query(point_geom)
+        for candidate in candidates:
+            if polygons[candidate].contains(point_geom):
+                return values[candidate]
+        return 0
+
+
+
+
+
+
+
 
 
 
